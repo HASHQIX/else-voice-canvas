@@ -19,5 +19,4 @@ COPY --from=build /app/PLAN/prompts ./PLAN/prompts
 RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 3000
-VOLUME ["/data"]
 CMD ["node", "dist/server/main.js"]
