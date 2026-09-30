@@ -20,20 +20,22 @@
   "demoPlatform": null,
   "applicationUrl": null,
   "videoPresentationUrl": null,
-  "slidePresentationUrl": null,
+  "slidePresentationUrl": "https://raw.githubusercontent.com/HASHQIX/else-voice-canvas/main/submission/presentation/ELSE_Pitch_Deck.pdf",
   "submissionDraftUrl": null,
   "teamConfirmed": false,
   "deadlineUtc": "2026-09-30T15:00:00Z",
   "deadlineWita": "2026-09-30T23:00:00+08:00",
-  "deliveryStatus": "Public source repository prepared; hosted demo, video, slide presentation and lablab submission are still required.",
+  "deliveryStatus": "Public source and pitch deck prepared; hosted demo, demo video and lablab submission are still required.",
   "notes": [
     "Labels are session-scoped, not identity recognition.",
     "Reports require the originating browser cookie; copy the report for external sharing.",
-    "No claim of a deployed application, video, deck, or confirmed lablab team."
+    "No claim of a deployed application, demo video, or confirmed lablab team."
   ],
   "sources": {
     "event": "https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon",
     "submissionGuide": "https://github.com/lablab-ai/community-content/blob/main/blog/en/hackathon-guidelines.mdx",
     "platformGuide": "https://lablab.ai/guide/ai-hackathons"
-  }
+  },
+  "slidePresentationFile": "presentation/ELSE_Pitch_Deck.pdf",
+  "editablePresentationFile": "presentation/ELSE_Pitch_Deck.pptx"
 }

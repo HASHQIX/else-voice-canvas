@@ -2,7 +2,9 @@ ELSE — PUBLIC COPY
 ------------------
 
 English copy for submission, video, team profile and deck.
-This file contains copy and a slide outline; it is not a recorded video or a finished slide PDF.
+Finished seven-slide deck: presentation/ELSE_Pitch_Deck.pdf
+Editable version: presentation/ELSE_Pitch_Deck.pptx
+This file contains reusable copy and a slide outline; the demo video remains to be recorded.
 
 TAGLINE
 -------
@@ -200,4 +202,5 @@ PUBLICATION LINKS
 -----------------
 
 Source: https://github.com/HASHQIX/else-voice-canvas
-Add the confirmed live demo, video and pitch deck URLs from submission/submission.json when available. Those URLs have not yet been supplied.
+Pitch deck: https://raw.githubusercontent.com/HASHQIX/else-voice-canvas/main/submission/presentation/ELSE_Pitch_Deck.pdf
+Add the confirmed live demo and video URLs from submission/submission.json when available. Those URLs have not yet been supplied.

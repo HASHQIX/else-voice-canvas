@@ -1,3 +1,9 @@
+## ELSE pitch deck — 2026-09-30
+
+- Added a short English deck in `submission/presentation/ELSE_Pitch_Deck.pdf` and an editable `ELSE_Pitch_Deck.pptx`. Seven slides cover ELSE, the missing-question problem, the conversational canvas, the actual product interface, architecture, AssemblyAI's role and practical use cases.
+- Uses the app's cream/charcoal palette, Helvetica Neue, a real screenshot with synthetic demonstration content, and editable text/architecture. The PDF embeds the fonts and retains selectable text. Speaker notes include source references and implementation boundaries; no adoption, revenue or clinical-validation claims are made.
+- README and submission fields now include the deck. The hosted application, demo video and completed lablab submission remain outstanding. No application code changed.
+
 ## Credential audit and first GitHub publication — 2026-09-30
 
 - The user supplied and authorized committing to `https://github.com/HASHQIX/else-voice-canvas`. GitHub reported a public, empty repository; configured it as origin. Existing local development history is retained.

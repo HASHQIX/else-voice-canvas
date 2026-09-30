@@ -18,7 +18,9 @@ Built for the [AssemblyAI Voice Agent Hackathon](https://lablab.ai/ai-hackathons
 
 **Source:** [HASHQIX/else-voice-canvas](https://github.com/HASHQIX/else-voice-canvas).
 
-Hosted demo, video and slide links have not yet been supplied. Submission fields and delivery status are recorded in [submission/submission.json](submission/submission.json). Reusable English copy for the pitch, video, team and seven slides is in [submission/public-copy.txt](submission/public-copy.txt).
+**Pitch deck:** [PDF](submission/presentation/ELSE_Pitch_Deck.pdf) and [editable PowerPoint](submission/presentation/ELSE_Pitch_Deck.pptx).
+
+Hosted demo and video links have not yet been supplied. Submission fields and delivery status are recorded in [submission/submission.json](submission/submission.json). Reusable English copy for the pitch, video, team and seven slides is in [submission/public-copy.txt](submission/public-copy.txt).
 
 ## Problem
 
