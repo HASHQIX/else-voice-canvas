@@ -1,9 +1,12 @@
+import type { ConversationField } from '../shared/field.js';
+import { normalizeSpeaker, type SpeechSegment } from '../shared/transcript.js';
+import type { ConversationReport } from '../shared/report.js';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { DomainError } from './validation.js';
-export type Snapshot = {schemaVersion:1;projectId:string;branchId:string;revision:number;nodes:Record<string,any>;navigation:Array<{parentId:string;childId:string}>;dependencies:any[];layout:Record<string,{x:number;y:number;width:number;height:number}>;pendingQuestionId:string|null};
+export type Snapshot = {schemaVersion:1;projectId:string;branchId:string;revision:number;nodes:Record<string,any>;navigation:Array<{parentId:string;childId:string}>;dependencies:any[];layout:Record<string,{x:number;y:number;width:number;height:number}>;pendingQuestionId:string|null;field?:ConversationField};
 const file=process.env.DATABASE_PATH||'./data/else.sqlite';fs.mkdirSync(path.dirname(path.resolve(file)),{recursive:true});
 export const db=new Database(file);db.pragma('journal_mode = WAL');db.pragma('foreign_keys = ON');db.pragma('busy_timeout = 5000');
 export const uuid=()=>crypto.randomUUID(), now=()=>new Date().toISOString();
@@ -14,6 +17,9 @@ CREATE TABLE IF NOT EXISTS branches(id TEXT PRIMARY KEY,project_id TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,revision INTEGER NOT NULL,type TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS transcripts(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,text TEXT NOT NULL,is_final INTEGER NOT NULL,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,context_epoch INTEGER NOT NULL DEFAULT 0,started_at TEXT NOT NULL,expires_at TEXT NOT NULL,ended_at TEXT);
+CREATE TABLE IF NOT EXISTS speech_segments(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,text TEXT NOT NULL,is_final INTEGER NOT NULL,created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS speech_segments_project ON speech_segments(project_id,created_at);
+CREATE TABLE IF NOT EXISTS conversation_reports(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,report TEXT NOT NULL,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS history(branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,position INTEGER NOT NULL,snapshot TEXT NOT NULL,PRIMARY KEY(branch_id,position));
 CREATE TABLE IF NOT EXISTS cursors(branch_id TEXT PRIMARY KEY REFERENCES branches(id) ON DELETE CASCADE,position INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS operations(owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,operation_id TEXT NOT NULL,response TEXT NOT NULL,PRIMARY KEY(owner_id,project_id,operation_id));
@@ -22,8 +28,21 @@ CREATE INDEX IF NOT EXISTS projects_owner ON projects(owner_id);
 CREATE INDEX IF NOT EXISTS branches_project ON branches(project_id);
 PRAGMA user_version = 1;
 `);
+// Additive and idempotent for conversations recorded before speaker labels existed.
+if (!(db.pragma('table_info(speech_segments)') as Array<{name:string}>).some(column => column.name === 'speaker_label')) {
+ db.exec('ALTER TABLE speech_segments ADD COLUMN speaker_label TEXT');
+}
 export function ensureOwner(id:string){db.prepare('INSERT OR IGNORE INTO owners VALUES(?,?)').run(id,now());}
 export function hasOwner(id:string){return Boolean(db.prepare('SELECT id FROM owners WHERE id=?').get(id));}
+export function saveConversationReport(owner: string, project: string, report: ConversationReport) {
+ const id = uuid();
+ db.prepare('INSERT INTO conversation_reports VALUES(?,?,?,?,?)').run(id, owner, project, JSON.stringify(report), report.capturedAt);
+ return id;
+}
+export function getConversationReport(owner: string, id: string): ConversationReport | null {
+ const row = db.prepare('SELECT report FROM conversation_reports WHERE id=? AND owner_id=?').get(id, owner) as { report: string } | undefined;
+ return row ? JSON.parse(row.report) : null;
+}
 export function getProject(owner:string,id:string){const p:any=db.prepare('SELECT * FROM projects WHERE id=? AND owner_id=?').get(id,owner);if(!p)return null;const branches:any[]=db.prepare('SELECT * FROM branches WHERE project_id=? AND owner_id=? ORDER BY created_at').all(id,owner);return {...p,branches:branches.map(b=>({...b,snapshot:JSON.parse(b.snapshot)}))};}
 export function listProjects(owner:string){return db.prepare('SELECT id,title,created_at,updated_at FROM projects WHERE owner_id=? ORDER BY updated_at DESC').all(owner);}
 export function getBranch(owner:string,project:string,id?:string){const b:any=id?db.prepare('SELECT * FROM branches WHERE id=? AND project_id=? AND owner_id=?').get(id,project,owner):db.prepare('SELECT * FROM branches WHERE project_id=? AND owner_id=? AND is_main=1').get(project,owner);return b?{...b,snapshot:JSON.parse(b.snapshot) as Snapshot}:null;}
@@ -39,6 +58,31 @@ export function historyStep(owner:string,project:string,branch:string,expected:n
 export function createBranch(owner:string,project:string,sourceId:string,label:string,snapshot:Snapshot,forkNodeId?:string){const source=getBranch(owner,project,sourceId);if(!source)throw new DomainError('not_found','Source branch not found',404);const count:any=db.prepare('SELECT COUNT(*) n FROM branches WHERE project_id=?').get(project);if(count.n>=Number(process.env.MAX_BRANCHES||8))throw new DomainError('branch_limit','Maximum number of branches reached',429);const id=uuid(),t=now(),s=structuredClone(snapshot);s.branchId=id;s.revision=0;const lane=count.n%2?Math.ceil(count.n/2)*520:-Math.ceil(count.n/2)*520; for(const [key,position] of Object.entries(s.layout)){if(s.nodes[key].kind!=='idea')position.x+=lane;}db.prepare('INSERT INTO branches VALUES(?,?,?,?,?,?,?,?,?)').run(id,project,owner,label,0,JSON.stringify(s),0,t,t);initializeHistory(s);return getBranch(owner,project,id)!;}
 export function setMain(owner:string,project:string,branch:string){if(!getBranch(owner,project,branch))throw new DomainError('not_found','Branch not found',404);db.transaction(()=>{db.prepare('UPDATE branches SET is_main=0 WHERE project_id=?').run(project);db.prepare('UPDATE branches SET is_main=1 WHERE id=?').run(branch);db.prepare('UPDATE projects SET updated_at=? WHERE id=?').run(now(),project);})();}
 export function saveTranscript(owner:string,project:string,branch:string,text:string,id=uuid()){db.prepare('INSERT OR IGNORE INTO transcripts VALUES(?,?,?,?,?,?,?)').run(id,project,branch,owner,text,1,now());return id;}
+type SpeechRow = {id:string;text:string;is_final:number;created_at:string;session_id:string;speaker_label:string|null};
+function speechSegment(row: SpeechRow): SpeechSegment {
+ return {id:row.id,text:row.text,final:Boolean(row.is_final),createdAt:row.created_at,
+  ...(row.speaker_label !== null ? {speaker:normalizeSpeaker(row.speaker_label),sessionId:row.session_id} : {})};
+}
+export function saveSpeechSegment(owner:string,project:string,session:string,segmentId:string,text:string,final:boolean,speaker?:string):SpeechSegment {
+ const id=`${session}:${segmentId}`;
+ const row=db.prepare(`INSERT INTO speech_segments(id,owner_id,project_id,session_id,text,is_final,created_at,speaker_label) VALUES(?,?,?,?,?,?,?,?)
+  ON CONFLICT(id) DO UPDATE SET text=excluded.text,is_final=excluded.is_final,speaker_label=excluded.speaker_label
+  WHERE speech_segments.is_final=0 OR excluded.is_final=1
+  RETURNING *`).get(id,owner,project,session,text,Number(final),now(),speaker === undefined ? null : normalizeSpeaker(speaker)) as SpeechRow | undefined;
+ if (!row) return speechSegment(db.prepare('SELECT * FROM speech_segments WHERE id=? AND owner_id=? AND project_id=?').get(id,owner,project) as SpeechRow);
+ return speechSegment(row);
+}
+export function speechSegmentsFor(owner:string,project:string):SpeechSegment[] {
+ const rows=db.prepare('SELECT * FROM speech_segments WHERE owner_id=? AND project_id=? ORDER BY created_at,rowid').all(owner,project) as SpeechRow[];
+ return rows.map(speechSegment);
+}
+/** Bound speaker context to the completed thought, excluding later in-flight speech. */
+export function speechContextFor(owner:string,project:string,throughId:string):SpeechSegment[] {
+ const rows=db.prepare(`SELECT * FROM speech_segments WHERE owner_id=? AND project_id=? AND is_final=1
+  AND rowid <= (SELECT rowid FROM speech_segments WHERE id=? AND owner_id=? AND project_id=?)
+  ORDER BY rowid DESC LIMIT 24`).all(owner,project,throughId,owner,project) as SpeechRow[];
+ return rows.reverse().map(speechSegment);
+}
 export function sourcesFor(owner:string,project:string){const rows:any[]=db.prepare('SELECT id,text FROM transcripts WHERE project_id=? AND owner_id=? AND is_final=1').all(project,owner);return new Map<string,string>(rows.map(r=>[r.id,r.text]));}
 export function operation(owner:string,project:string,id:string){const row:any=db.prepare('SELECT response FROM operations WHERE owner_id=? AND project_id=? AND operation_id=?').get(owner,project,id);return row?JSON.parse(row.response):null;}
 export function recordOperation(owner:string,project:string,id:string,response:any){db.prepare('INSERT INTO operations VALUES(?,?,?,?)').run(owner,project,id,JSON.stringify(response));}

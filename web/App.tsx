@@ -1,64 +1,354 @@
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {ApiError,cacheSnapshot,clientId,purgeProjectCache,createGuest,createProject,createSession,getProject,listProjects,openLive,request,sendCommand,sendTextTurn,type NodeVersion,type Project,type Snapshot} from './api';
-import {Board,type CameraMode,type Draft} from './Board';
-import {MicrophoneCapture,StreamedPcmPlayer} from './voice';
-
-type Language='en';type VoiceState='idle'|'starting'|'listening'|'endpoint'|'finalizing';
-const errorText=(error:unknown,_lang:Language)=>{const code=error instanceof ApiError?error.code:error instanceof Error?error.message:String(error);const descriptions:Record<string,string>={provider_unavailable:'AI services are not ready. Text can be saved after provider configuration.',providers_unavailable:'Voice services are not configured. Type or retry later.',budget_unconfigured:'The operator has not configured a spending limit. Your text is preserved.',provider_error:'The AI service is temporarily unavailable. Your text is preserved.',provider_incomplete:'The AI service did not finish. Your text is preserved.',invalid_plan:'The AI response failed validation. Your text is preserved.',tts_unavailable:'The response text is saved; spoken playback is unavailable.',stt_error:'Speech recognition stopped. Your last thought is available for recovery.',stt_not_configured:'Speech recognition unavailable. Use text.',revision_conflict:'The board changed. The latest version was loaded; retry the action.',not_allowed:'Action unavailable.'};return `${descriptions[code]||'Unable to complete action'} (${code})`};
-
-export function App(){
- const [lang]=useState<Language>('en');
- const [project,setProject]=useState<Project|null>(null),[projects,setProjects]=useState<Project[]>([]),[snapshot,setSnapshot]=useState<Snapshot|null>(null),[branchId,setBranchId]=useState('');
- const [cameraMode,setCameraMode]=useState<CameraMode>('FOLLOW'),[selectedId,setSelectedId]=useState<string|null>(null),[focusId,setFocusId]=useState<string|null>(null),[inspector,setInspector]=useState(false);
- const [draft,setDraft]=useState<Draft|null>(null),[transcript,setTranscript]=useState(''),[assistant,setAssistant]=useState(''),[text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[initialized,setInitialized]=useState(false);
- const [voice,setVoice]=useState<VoiceState>('idle'),[muted,setMuted]=useState(false),[hold,setHold]=useState(false),[level,setLevel]=useState(0),[analysisMode,setAnalysisMode]=useState<'develop'|'challenge'>('develop');
- const [settings,setSettings]=useState(false),[projectMenu,setProjectMenu]=useState(false),[guestCode,setGuestCode]=useState(''),[needGuestCode,setNeedGuestCode]=useState(false),[projectName,setProjectName]=useState('');
- const [reducedMotion,setReducedMotion]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches),[notice,setNotice]=useState('');
- const [writable,setWritable]=useState(true),[leaseReady,setLeaseReady]=useState(false),[ending,setEnding]=useState(false);
- const [editTitle,setEditTitle]=useState(''),[editBody,setEditBody]=useState(''),[editDirty,setEditDirty]=useState(false),[branchLabel,setBranchLabel]=useState(''),[branchDialog,setBranchDialog]=useState(false);
- const micRef=useRef<MicrophoneCapture|null>(null),playerRef=useRef<StreamedPcmPlayer|null>(null),liveRef=useRef<ReturnType<typeof openLive>|null>(null),stateRef=useRef({muted,lang,project,snapshot,branchId}),lastReply=useRef(''),readyRef=useRef(false),startGeneration=useRef(0),wireSession=useRef(''),wireEpoch=useRef(0),finishWait=useRef<((ok:boolean)=>void)|null>(null); const inputRef=useRef<HTMLTextAreaElement>(null);
- stateRef.current={muted,lang,project,snapshot,branchId};
- const activeBranch=project?.branches.find(b=>b.id===branchId); const selected=selectedId?snapshot?.nodes[selectedId]:null;
- const question=useMemo(()=>snapshot?.pendingQuestionId?snapshot.nodes[snapshot.pendingQuestionId]:null,[snapshot]);
- const nodes=useMemo(()=>snapshot?Object.values(snapshot.nodes):[],[snapshot]);const root=nodes.find(n=>n.kind==='idea');
- const readProject=useCallback((p:Project,preferredId?:string)=>{let view:any={};try{view=JSON.parse(localStorage.getItem('else.view.'+p.id)||'{}')}catch{}const b=p.branches.find(x=>x.id===(preferredId||view.branchId))||p.branches.find(x=>x.is_main)||p.branches[0];setProject(p);if(b){setSnapshot(b.snapshot);setBranchId(b.id);setFocusId(view.focusId&&b.snapshot.nodes[view.focusId]?view.focusId:b.snapshot.pendingQuestionId||Object.keys(b.snapshot.nodes)[0]);cacheSnapshot(b.snapshot)}localStorage.setItem('else.project',p.id);setDraft(null);setTranscript('');setAssistant('');setSelectedId(null);setInspector(false);setEditDirty(false)},[]);
- const initialize=useCallback(async()=>{setError('');try{await createGuest(guestCode||undefined);const ps=await listProjects();setProjects(ps);const last=localStorage.getItem('else.project');const id=ps.find(p=>p.id===last)?.id||ps[0]?.id;if(id)readProject(await getProject(id));else{const p=await createProject('Untitled conversation',lang);setProjects([p]);readProject(p)}setNeedGuestCode(false)}catch(e){if(e instanceof ApiError&&(e.code==='demo_code_required'||e.status===401||e.status===403))setNeedGuestCode(true);setError(errorText(e,lang))}finally{setInitialized(true)}},[guestCode,lang,readProject,needGuestCode]);
- useEffect(()=>{initialize()},[]);
- useEffect(()=>{localStorage.setItem('else.language','en');document.documentElement.lang='en'},[]);
- const teardown=useCallback(async(sendStop=true)=>{startGeneration.current++;wireSession.current='';readyRef.current=false;finishWait.current?.(false);if(sendStop)liveRef.current?.send('fork.stop');liveRef.current?.close();liveRef.current=null;const mic=micRef.current;micRef.current=null;if(mic)await mic.stop();const player=playerRef.current;playerRef.current=null;if(player)await player.dispose();setVoice('idle');setLevel(0)},[]);
- useEffect(()=>()=>{teardown();playerRef.current?.dispose()},[teardown]);
- const failure=useCallback(async(e:unknown)=>{setError(errorText(e,stateRef.current.lang));if(e instanceof ApiError&&e.status===409&&stateRef.current.project){readProject(await getProject(stateRef.current.project.id),stateRef.current.branchId)}},[readProject]);
- const applyAck=useCallback((r:any)=>{const current=stateRef.current;const next=r.snapshot;if(r.project){const p:Project=r.project;setProject(p);setProjects(ps=>ps.map(x=>x.id===p.id?p:x))}if(next){const shouldActivate=next.branchId===current.branchId||r.activateBranch===true||r.plan?.branchIntent?.exploreNow===true;if(shouldActivate){setSnapshot(next);setBranchId(next.branchId);setFocusId(r.focusId||next.pendingQuestionId||Object.keys(next.nodes)[0]);}setProject(p=>p?({...p,branches:p.branches.some(b=>b.id===next.branchId)?p.branches.map(b=>b.id===next.branchId?({...b,snapshot:next,revision:next.revision}):b):[...p.branches,{id:next.branchId,label:r.plan?.branchIntent?.label||'Alternative',revision:next.revision,is_main:0,snapshot:next}]}):p);cacheSnapshot(next);setNotice('Changes saved')}setDraft(null);setTranscript('');if(r.plan?.assistantText)setAssistant(r.plan.assistantText)},[]);
- const playReply=useCallback(async(replyId?:string)=>{if(!replyId||stateRef.current.muted||lastReply.current===replyId)return;lastReply.current=replyId;try{playerRef.current||=new StreamedPcmPlayer();await playerRef.current.play(`/api/replies/${encodeURIComponent(replyId)}/audio`)}catch(e){setNotice('Response text saved; audio unavailable.')}},[]);
- const onWire=useCallback((m:any)=>{if(m.sessionId!==wireSession.current||m.contextEpoch<wireEpoch.current)return;wireEpoch.current=m.contextEpoch;const p=m.payload||{};switch(m.type){case'fork.ready':readyRef.current=p.stt!==false;micRef.current?.setReady(readyRef.current);if(readyRef.current){setVoice('listening')}else{setError('Speech recognition unavailable. Use text.');teardown(false)}break;case'fork.transcript':setTranscript(p.text||p.transcript||'');if(p.speechStarted){playerRef.current?.stop()}break;case'fork.draft':{const value=Object.hasOwn(p,'preview')?p.preview:p.draft;if(value&&typeof value.ideaTitle==='string'&&Array.isArray(value.draftItems))setDraft(value);else setDraft(null);break;}case'fork.speech_started':playerRef.current?.stop();setVoice('listening');break;case'fork.agent_status':if(p.status==='speaking'){playerRef.current?.stop();setVoice('listening')}if(p.status==='finalizing')setVoice('finalizing');if(p.status==='listening')setVoice('listening');if(p.status==='endpoint_pending')setVoice('endpoint');break;case'fork.committed':applyAck(p);finishWait.current?.(true);setVoice(readyRef.current?'listening':'idle');if(p.replyId)playReply(p.replyId);break;case'fork.reply':setAssistant(p.text||p.assistantText||'');playReply(p.replyId);break;case'fork.error':setError(p.message||p.code||'Voice error');if(p.recoverableText)setText(p.recoverableText);finishWait.current?.(false);if(p.fatal||['stt_unavailable','stt_not_configured','session_expired'].includes(p.code))teardown(false);else setVoice(readyRef.current?'listening':'idle');break}},[applyAck,playReply,teardown]);
- const startVoice=async()=>{if(!project||!snapshot||voice!=='idle'||!writable||!leaseReady)return;const generation=++startGeneration.current;setError('');setVoice('starting');playerRef.current||=new StreamedPcmPlayer();try{await playerRef.current.unlock();const health=await request('/readyz');if(!health.providers?.assemblyai||!health.providers?.llm)throw new Error('provider_unavailable');const session=await createSession(project.id,branchId,lang);if(generation!==startGeneration.current)return;wireSession.current=session.id;wireEpoch.current=0;const live=openLive(session.id,{message:onWire,error:()=>setError('Connection interrupted. Current board is saved.'),close:()=>{if(liveRef.current===live)teardown(false)}});liveRef.current=live;await live.ready;if(generation!==startGeneration.current){live.close();return}const mic=new MicrophoneCapture({onLevel:(v:number,speaking:boolean)=>{setLevel(v);playerRef.current?.setDucked(speaking)},onError:(e:Error)=>{setError(errorText(e,lang));teardown()}});micRef.current=mic;await mic.start(live.socket);if(generation!==startGeneration.current){await mic.stop();live.close();return}mic.setReady(readyRef.current);live.send('fork.start',{language:lang,mode:analysisMode,muted,hold});if(readyRef.current)setVoice('listening')}catch(e){await teardown();setError(errorText(e,lang))}};
- const finishThought=async()=>{if(!liveRef.current)return;try{await micRef.current?.flush();liveRef.current.send('fork.finish_thought');setVoice('endpoint')}catch(e){await failure(e)}};
- const finishSession=async()=>{if(ending)return;setEnding(true);try{const result=new Promise<boolean>(resolve=>{const timer=setTimeout(()=>{finishWait.current=null;resolve(false)},10000);finishWait.current=ok=>{clearTimeout(timer);finishWait.current=null;resolve(ok)}});await finishThought();const saved=await result;if(!saved&&transcript)setText(transcript);await teardown();setNotice('Conversation ended. Selected decisions, open questions and tests remain on the board.')}finally{setEnding(false)}};
- const submit=async(value=text,questionId?:string)=>{if(!project||!snapshot||!value.trim()||busy||!writable||!leaseReady)return;setBusy(true);setError('');playerRef.current?.stop();if(liveRef.current)await teardown();if(!muted){try{playerRef.current||=new StreamedPcmPlayer();await playerRef.current.unlock()}catch{}}try{const r=await sendTextTurn(project.id,value.trim(),branchId,lang,muted,analysisMode,snapshot.revision,questionId);applyAck(r);setText('');playReply(r.replyId)}catch(e){if(!text)setText(value);await failure(e)}finally{setBusy(false)}};
- const command=useCallback(async(type:string,payload:any={})=>{const s=stateRef.current;if(!s.project||!s.snapshot||!writable||!leaseReady)return;setBusy(true);setError('');try{const r=await sendCommand(s.project.id,type,payload,s.branchId,s.snapshot.revision);applyAck(r);if(type==='switch_branch'&&r.snapshot){setSnapshot(r.snapshot);setBranchId(r.snapshot.branchId);setFocusId(r.snapshot.pendingQuestionId||Object.keys(r.snapshot.nodes)[0]);setSelectedId(null);setInspector(false)}return r}catch(e){await failure(e)}finally{setBusy(false)}},[applyAck,failure,writable,leaseReady]);
- const selectNode=(id:string|null)=>{setSelectedId(id);setInspector(false);const n=id?snapshot?.nodes[id]:null;setEditTitle(n?.title||'');setEditBody(n?.body||'');setEditDirty(false);};
- const newProject=async()=>{if(!projectName.trim())return;setBusy(true);setError('');try{await teardown();const p=await createProject(projectName.trim(),lang);setProjects(x=>[p,...x]);readProject(p);setProjectName('');setProjectMenu(false)}catch(e){await failure(e)}finally{setBusy(false)}};
- const switchBranch=async(id:string)=>{if(id===branchId)return;await teardown();await command('switch_branch',{branchId:id});setCameraMode('FOLLOW')};
- const branch=async()=>{if(!branchLabel.trim()||!selected)return;await teardown();const r=await command('create_branch',{label:branchLabel.trim(),forkNodeId:selected.logicalId,exploreNow:false});if(r){setBranchDialog(false);setBranchLabel('');setNotice('Alternative saved. Select it to explore.')}};
- const undo=()=>command('undo'),redo=()=>command('redo');
- useEffect(()=>{const keyboard=(e:KeyboardEvent)=>{const target=e.target as HTMLElement;if(['INPUT','TEXTAREA','SELECT'].includes(target.tagName)||target.isContentEditable)return;if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if(e.key==='Escape'){setInspector(false);setSettings(false);setProjectMenu(false)}};window.addEventListener('keydown',keyboard);return()=>window.removeEventListener('keydown',keyboard)},[command]);
- const pendingOptions=question?.attributes?.options||[];
- const lease=useCallback(async(takeover=false)=>{if(!project)return;try{const result=await request(`/api/projects/${project.id}/lease`,{clientId,takeover});setWritable(result.writable);setLeaseReady(true);if(!result.writable&&liveRef.current)await teardown()}catch(e){setLeaseReady(false);setError(errorText(e,lang))}},[project?.id,lang,teardown]);
- useEffect(()=>{if(!project)return;setLeaseReady(false);lease();const timer=setInterval(()=>lease(),15000);return()=>clearInterval(timer)},[project?.id,lease]);
- useEffect(()=>{if(project)localStorage.setItem('else.view.'+project.id,JSON.stringify({branchId,focusId}))},[project?.id,branchId,focusId]);
- const deleteCurrent=async()=>{if(!project||!window.confirm('Delete this project and all branches? This cannot be undone.'))return;try{await teardown();await request(`/api/projects/${project.id}`,undefined,'DELETE');await purgeProjectCache(project.id);const ps=await listProjects();setProjects(ps);if(ps[0])readProject(await getProject(ps[0].id));else{setProject(null);setSnapshot(null)}setProjectMenu(false)}catch(e){await failure(e)}};
- const visualContent=Boolean(question||draft||transcript||assistant||nodes.some(n=>n.kind!=='idea'||Boolean(n.body.trim())));
- return <div className="app-shell voice-only"><header className="topbar"><a className="brand" href="#" onClick={e=>{e.preventDefault();setProjectMenu(v=>!v)}} aria-label="ELSE projects">ELSE<span className="brand-dot">.</span></a><button className="project-title" onClick={()=>setProjectMenu(v=>!v)}>{project?.title||'New idea'} <span>⌄</span></button><nav className="mode-tabs" aria-label={'Board mode'}><button className={['FOLLOW','MANUAL'].includes(cameraMode)?'active':''} onClick={()=>setCameraMode('FOLLOW')}>{'Path'}</button><button className={cameraMode==='OVERVIEW'?'active':''} onClick={()=>setCameraMode('OVERVIEW')}>{'Overview'}</button><button className={cameraMode==='COMPARE'?'active':''} onClick={()=>setCameraMode('COMPARE')}>{'Compare'}</button></nav><div className="top-actions"><span className={`save-state ${busy?'pending':''}`}>● {busy?'saving…':project?'saved':'—'}</span><button title={'Settings'} onClick={()=>setSettings(v=>!v)}>⚙</button>{voice!=='idle'&&<button disabled={ending} onClick={finishSession}>{'Finish'}</button>}</div></header>
- {project?<><div className="crumb"><span className="crumb-root">{root?.title||project.title}</span><span>›</span><select aria-label={'Active branch'} value={branchId} onChange={e=>switchBranch(e.target.value)}>{project.branches.map(b=><option key={b.id} value={b.id}>{b.is_main?'◆ ':''}{b.label}</option>)}</select><span>›</span>{selected?.domain||'Developing the idea'}<span className="mode-label">{cameraMode==='MANUAL'?'Manual camera':cameraMode==='FOLLOW'?'Following your thought':''}</span></div><main className={`workspace ${inspector?'has-inspector':''} ${visualContent?'has-content':'empty-content'}`}>{snapshot&&(cameraMode==='COMPARE'?<Compare project={project} lang={lang} onSwitch={switchBranch} onMain={id=>command('set_main',{branchId:id})}/>:<Board snapshot={snapshot} draft={draft} transcript={transcript} mode={cameraMode} setMode={setCameraMode} selectedId={selectedId} select={selectNode} focusId={focusId} lang={lang} reducedMotion={reducedMotion}/>)}{inspector&&selected&&<aside className="inspector" aria-label={'Card details'}><div className="inspector-head"><span>{'Details'}</span><button aria-label={'Close'} onClick={()=>setInspector(false)}>×</button></div><div className="type-line"><span className="kind">{selected.kind}</span><span>{selected.domain}</span></div><label>{'Title'}<input disabled={selected.locked||!writable} value={editTitle} maxLength={80} onChange={e=>{setEditTitle(e.target.value);setEditDirty(true);setCameraMode('MANUAL')}}/></label><label>{'Content'}<textarea disabled={selected.locked||!writable} value={editBody} maxLength={600} onChange={e=>{setEditBody(e.target.value);setEditDirty(true);setCameraMode('MANUAL')}}/></label>{editDirty&&<button className="primary full" disabled={busy} onClick={async()=>{const r=await command('edit_node',{nodeId:selected.logicalId,title:editTitle,body:editBody});if(r)setEditDirty(false)}}>{'Save changes'}</button>}<div className="meta"><span>{selected.origin==='user'?'Your words':'AI suggestion'}</span><span>{selected.evidence==='user_reported'?'User reported':'Unverified'}</span></div>{selected.freshness==='needs_review'&&<p className="review-label">{'Review after a supporting decision changed'}</p>}{selected.kind==='issue'&&<IssueDetails node={selected} lang={lang} onAction={submit}/>}<div className="source-quotes">{selected.sourceRefs?.map((s,i)=><blockquote key={i}>{s.quote}</blockquote>)}</div><h3>{'Dependencies'}</h3>{snapshot?.dependencies.filter(d=>d.sourceRef===selected.logicalId||d.targetRef===selected.logicalId).map((d,i)=>{const id=d.sourceRef===selected.logicalId?d.targetRef:d.sourceRef;return <button className="relationship" key={i} onClick={()=>selectNode(id)}>{d.label||d.kind} → {snapshot.nodes[id]?.title}</button>})}<button className="secondary full" disabled={busy} onClick={()=>command('set_locked',{nodeId:selected.logicalId,locked:!selected.locked})}>{selected.locked?'◇ Unlock':'◆ Lock condition'}</button><button className="secondary full" onClick={()=>setBranchDialog(true)}>＋ {'Explore alternative'}</button><button className="link full" disabled={busy} onClick={()=>command('defer',{nodeId:selected.logicalId})}>{'Defer'}</button></aside>}</main></>:<main className="welcome"><div className="welcome-kicker">{'SPACE FOR YOUR THOUGHT'}</div><h1>{'What if…'}</h1><p>{'Start with an idea. ELSE helps reveal its structure, find open questions, and explore different directions.'}</p><form onSubmit={e=>{e.preventDefault();newProject()}}><input autoFocus placeholder={'Name your idea'} value={projectName} onChange={e=>setProjectName(e.target.value)} aria-label={'Project name'}/><button className="primary" disabled={busy||!projectName.trim()||!initialized||needGuestCode}>{'Create a space'} →</button></form><small>{'Speak freely. Your decisions and alternatives stay on the board.'}</small></main>}
- {project&&<><div className={`conversation-area ${inspector?'inspecting':''} ${visualContent?'has-content':'empty-canvas'}`}><div className="agent-caption" aria-live="polite">{assistant&&<span>{assistant}</span>}</div>{question&&<div className="question"><span className="badge">{'Next question'}</span><strong>{question.title||question.body}</strong><div className="options">{pendingOptions.map((o:any)=><button key={o.ref||o.label} disabled={busy} onClick={()=>submit(o.label,question.logicalId)}>{o.label}</button>)}<button className="other-answer" onClick={()=>inputRef.current?.focus()}>{'Other answer'}</button><button onClick={()=>submit('I don’t know yet')}>{'Unknown'}</button><button onClick={()=>submit('Skip this question')}>{'Skip'}</button></div></div>}<div className="voice-panel"><div className="voice-row"><button className={`mic ${voice==='listening'?'on':''}`} style={{boxShadow:voice==='listening'?`0 0 0 ${4+level*16}px rgba(70,92,232,.09)`:undefined}} disabled={busy||!writable||!leaseReady||['starting','endpoint','finalizing'].includes(voice)} onClick={voice==='listening'?finishThought:startVoice} aria-label={voice==='listening'?'Finish thought':'Start conversation'}><MicIcon live={voice==='listening'}/></button><div className="voice-copy"><span>{'Discussing:'} <b>{selected?.title||question?.title||question?.body||root?.title||project.title}</b></span><small>{voice==='starting'?'Connecting microphone and speech recognition…':voice==='endpoint'?'Waiting for final transcript…':voice==='finalizing'?'Considering your thought…':voice==='listening'?hold?'Listening. Finish with the button.':'Listening…':'Start speaking or type below'}</small></div><button className={`toggle ${muted?'active':''}`} onClick={async()=>{const next=!muted;setMuted(next);liveRef.current?.send('fork.set_muted',{muted:next});if(next)playerRef.current?.stop();else{playerRef.current||=new StreamedPcmPlayer();await playerRef.current.unlock()}}} aria-label={muted?'Enable spoken responses':'Mute spoken responses'} title={'Spoken responses'}>{muted?'♧':'♪'}</button>{voice!=='idle'&&<button className="stop-session" onClick={finishSession} disabled={ending} title={'Stop microphone'}>■</button>}</div>{transcript&&<div className="live-transcript"><span>{'Your speech'}</span>{transcript}</div>}<form className="text-row" onSubmit={e=>{e.preventDefault();submit()}}><textarea disabled={!writable} rows={1} ref={inputRef} value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}}} placeholder={'Or type your thought…'} aria-label={'Thought text'}/><button className="send" type="submit" disabled={!text.trim()||busy||!writable||!leaseReady} aria-label={'Send'}>↑</button></form><div className="conversation-tools"><button className={analysisMode==='develop'?'active':''} onClick={()=>{setAnalysisMode('develop');liveRef.current?.send('fork.set_mode',{mode:'develop'})}}>{'Develop'}</button><button className={analysisMode==='challenge'?'active':''} onClick={()=>{setAnalysisMode('challenge');liveRef.current?.send('fork.set_mode',{mode:'challenge'})}}>{'Challenge'}</button><label><input type="checkbox" checked={hold} onChange={e=>{setHold(e.target.checked);liveRef.current?.send('fork.set_hold',{hold:e.target.checked})}}/>{'Do not interrupt my thought'}</label></div></div></div><div className="history-tools"><button aria-label={'Undo'} title="Ctrl/Cmd+Z" onClick={undo} disabled={busy}>↶</button><button aria-label={'Redo'} title="Ctrl/Cmd+Shift+Z" onClick={redo} disabled={busy}>↷</button></div></>}
- {project&&leaseReady&&!writable&&<div className="lease-banner">{'This board is open in another tab. Read only.'} <button onClick={()=>lease(true)}>{'Continue here'}</button></div>}
- {(error||notice)&&<div className={`toast ${error?'error':''}`} role={error?'alert':'status'}><span>{error||notice}</span><button onClick={()=>{setError('');setNotice('')}} aria-label={'Dismiss'}>×</button></div>}
- <div className="privacy">{'Speech is processed by AssemblyAI and an AI service. Responses may use a synthetic voice. Audio is not retained.'}</div>
- {projectMenu&&<div className="popover projects-popover"><div className="popover-title">{'Your spaces'}<button onClick={()=>setProjectMenu(false)}>×</button></div>{projects.map(p=><button key={p.id} className="project-entry" onClick={async()=>{await teardown();readProject(await getProject(p.id));setProjectMenu(false)}}>{p.title}<span>→</span></button>)}<form onSubmit={e=>{e.preventDefault();newProject()}}><input placeholder={'New idea'} value={projectName} onChange={e=>setProjectName(e.target.value)}/><button className="primary" disabled={!projectName.trim()||busy}>＋</button></form>{project&&<div className="export-links"><a href={`/api/projects/${project.id}/export?format=json`} download>JSON ↗</a><a href={`/api/projects/${project.id}/export?format=markdown`} download>Markdown ↗</a><button className="delete-link" onClick={deleteCurrent}>{'Delete project'}</button></div>}</div>}
- {settings&&<div className="popover settings-popover"><div className="popover-title">{'Conversation settings'}<button onClick={()=>setSettings(false)}>×</button></div><label className="check"><input type="checkbox" checked={reducedMotion} onChange={e=>setReducedMotion(e.target.checked)}/>{'Reduced motion'}</label><p>{'ELSE uses English for the interface and AI responses.'}</p><p>{'Demo projects are retained for 7 days. Export them for safekeeping.'}</p></div>}
- {(needGuestCode||branchDialog)&&<div className="modal-backdrop"><form className="dialog" onSubmit={e=>{e.preventDefault();needGuestCode?initialize():branch()}}><h2>{needGuestCode?'Access ELSE':'New alternative'}</h2><p>{needGuestCode?'Enter the demo access code.':'The current branch remains intact. The new direction will be saved separately.'}</p><input autoFocus value={needGuestCode?guestCode:branchLabel} onChange={e=>needGuestCode?setGuestCode(e.target.value):setBranchLabel(e.target.value)} aria-label={needGuestCode?'Access code':'Branch name'}/><div><button className="primary" disabled={busy}>{needGuestCode?'Continue':'Save branch'}</button>{!needGuestCode&&<button type="button" onClick={()=>setBranchDialog(false)}>{'Cancel'}</button>}</div></form></div>}
- </div>
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ApiError, clientId, createGuest, createProject, createSession, getProject, getTranscript, listProjects, openLive, request, type Project, type Snapshot } from './api';
+import { mergeSpeechSegments, type SpeechSegment } from '../shared/transcript';
+import { ConversationField } from './ConversationField';
+import { ConversationPlan } from './ConversationPlan';
+import { MicrophoneCapture } from './voice';
+import { useBrowserInsets } from './useBrowserInsets';
+type Phase = 'idle' | 'starting' | 'listening' | 'thinking' | 'pausing';
+const messageFor = (error: unknown) => {
+    const code = error instanceof ApiError ? error.code : error instanceof Error ? error.message : String(error);
+    if (error instanceof DOMException && error.name === 'NotAllowedError')
+        return 'Allow microphone access in your browser, then try again.';
+    if (error instanceof DOMException && error.name === 'NotFoundError')
+        return 'Connect a microphone, then try again.';
+    const messages: Record<string, string> = {
+        microphone_gesture_required: 'Your browser needs a click to start audio. Press Resume microphone.',
+        provider_unavailable: 'The conversation service is unavailable. Your saved field is still here.',
+        budget_exhausted: 'The daily analysis limit has been reached. Your field is saved.',
+        editor_lease: 'This conversation is open in another tab.',
+        access_code_required: 'Enter the access code to begin.',
+    };
+    return messages[code] || (error instanceof Error ? error.message : 'Unable to connect. Please try again.');
+};
+export function App() {
+    useBrowserInsets();
+    const [project, setProject] = useState<Project | null>(null);
+    const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+    const [phase, setPhase] = useState<Phase>('idle');
+    const [leaseReady, setLeaseReady] = useState(false);
+    const [writable, setWritable] = useState(true);
+    const [initialized, setInitialized] = useState(false);
+    const [error, setError] = useState('');
+    const [transcript, setTranscript] = useState('');
+    const [speechSegments, setSpeechSegments] = useState<SpeechSegment[]>([]);
+    const [preview, setPreview] = useState('');
+    const [needCode, setNeedCode] = useState(false);
+    const [code, setCode] = useState('');
+    const [creating, setCreating] = useState(false);
+    const creatingConversation = useRef(false);
+    const mic = useRef<MicrophoneCapture | null>(null);
+    const microphoneLevel = useRef<HTMLSpanElement>(null);
+    const stream = useRef<MediaStream | null>(null);
+    const live = useRef<ReturnType<typeof openLive> | null>(null);
+    const generation = useRef(0);
+    const ready = useRef(false);
+    const connecting = useRef(false);
+    const autoAttempt = useRef('');
+    const pauseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const renewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const resumeAfterClose = useRef(false);
+    const startAgain = useRef<() => Promise<void>>(async () => { });
+    const pauseForRenewal = useRef<(renew?: boolean) => Promise<void>>(async () => { });
+    const boot = useRef<Promise<Project> | null>(null);
+    const current = useRef({ project, snapshot, leaseReady, writable });
+    current.current = { project, snapshot, leaseReady, writable };
+    const showProject = useCallback((value: Project) => {
+        const branch = value.branches.find(branch => branch.is_main) || value.branches[0];
+        current.current = { project: value, snapshot: branch.snapshot, leaseReady: false, writable: true };
+        setProject(value);
+        setSnapshot(branch.snapshot);
+        setLeaseReady(false);
+        setWritable(true);
+        setTranscript('');
+        setSpeechSegments([]);
+        setPreview('');
+        setError('');
+        localStorage.setItem('else.project', value.id);
+    }, []);
+    const disconnect = useCallback(() => {
+        generation.current++;
+        ready.current = false;
+        connecting.current = false;
+        clearTimeout(pauseTimer.current);
+        clearTimeout(renewTimer.current);
+        resumeAfterClose.current = false;
+        const connection = live.current;
+        live.current = null;
+        connection?.close();
+        const capture = mic.current;
+        mic.current = null;
+        void capture?.stop();
+        stream.current?.getTracks().forEach(track => track.stop());
+        stream.current = null;
+        microphoneLevel.current?.style.setProperty('--microphone-level', '0');
+        setPhase('idle');
+    }, []);
+    const load = useCallback((accessCode?: string) => {
+        return (async () => {
+            await createGuest(accessCode);
+            const projects = await listProjects();
+            const last = localStorage.getItem('else.project');
+            const id = projects.find(project => project.id === last)?.id || projects[0]?.id;
+            return id ? getProject(id) : createProject('Untitled conversation', 'en');
+        })();
+    }, []);
+    useEffect(() => {
+        let active = true;
+        boot.current ||= load();
+        boot.current.then(value => { if (active)
+            showProject(value); }).catch(error => {
+            if (!active)
+                return;
+            setNeedCode(error instanceof ApiError && error.code === 'access_code_required');
+            setError(messageFor(error));
+        }).finally(() => { if (active)
+            setInitialized(true); });
+        return () => { active = false; disconnect(); };
+    }, [load, showProject, disconnect]);
+    useEffect(() => {
+        if (!project) return;
+        let active = true;
+        getTranscript(project.id).then(({ segments }) => {
+            // Speech received while history loads is newer than the fetched copy.
+            if (active && current.current.project?.id === project.id) setSpeechSegments(current => mergeSpeechSegments(segments, current));
+        }).catch(error => { if (active && current.current.project?.id === project.id) setError(messageFor(error)); });
+        return () => { active = false; };
+    }, [project?.id]);
+    useEffect(() => {
+        if (!project)
+            return;
+        let active = true;
+        const refresh = async () => {
+            try {
+                const result = await request(`/api/projects/${project.id}/lease`, { clientId });
+                if (!active || current.current.project?.id !== project.id)
+                    return;
+                current.current.leaseReady = true;
+                current.current.writable = result.writable;
+                setLeaseReady(true);
+                setWritable(result.writable);
+                if (!result.writable)
+                    disconnect();
+            }
+            catch (error) {
+                if (active && current.current.project?.id === project.id) {
+                    current.current.leaseReady = false;
+                    setLeaseReady(false);
+                    disconnect();
+                    setError(messageFor(error));
+                }
+            }
+        };
+        void refresh();
+        const timer = setInterval(refresh, 15000);
+        return () => { active = false; clearInterval(timer); };
+    }, [project?.id, disconnect]);
+    const start = useCallback(async () => {
+        const state = current.current;
+        if (!state.project || !state.snapshot || !state.leaseReady || !state.writable || creatingConversation.current || connecting.current || live.current)
+            return;
+        const token = ++generation.current;
+        connecting.current = true;
+        setPhase('starting');
+        setError('');
+        let granted: MediaStream | undefined;
+        let createdSessionId: string | undefined;
+        try {
+            if (!navigator.mediaDevices?.getUserMedia)
+                throw new Error('Microphone access requires HTTPS or localhost.');
+            // Request permission immediately, before waiting for a provider connection.
+            granted = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
+            if (token !== generation.current) {
+                granted.getTracks().forEach(track => track.stop());
+                return;
+            }
+            stream.current = granted;
+            const health = await request('/readyz');
+            if (!health.voiceReady)
+                throw new Error('provider_unavailable');
+            if (token !== generation.current)
+                return;
+            const session = await createSession(state.project.id, state.snapshot.branchId, 'en');
+            createdSessionId = session.id;
+            if (token !== generation.current) {
+                await request(`/api/sessions/${encodeURIComponent(session.id)}`, undefined, 'DELETE');
+                return;
+            }
+            let epoch = 0;
+            const connection = openLive(session.id, {
+                message: message => {
+                    if (token !== generation.current || message.sessionId !== session.id || message.contextEpoch < epoch)
+                        return;
+                    epoch = message.contextEpoch;
+                    const payload = message.payload || {};
+                    switch (message.type) {
+                        case 'fork.ready':
+                            ready.current = true;
+                            mic.current?.setReady(true);
+                            setPhase('listening');
+                            break;
+                        case 'fork.transcript':
+                            setTranscript(payload.text || payload.transcript || '');
+                            break;
+                        case 'fork.speech_segment':
+                            if (payload.segment)
+                                setSpeechSegments(current => mergeSpeechSegments(current, [payload.segment]));
+                            break;
+                        case 'fork.draft':
+                            setPreview(payload.preview?.ideaTitle || '');
+                            break;
+                        case 'fork.agent_status':
+                            if (payload.status === 'finalizing')
+                                setPhase(value => value === 'pausing' ? value : 'thinking');
+                            if (payload.status === 'listening' || payload.status === 'speaking')
+                                setPhase(value => value === 'pausing' ? value : 'listening');
+                            break;
+                        case 'fork.committed':
+                            if (payload.snapshot) {
+                                current.current.snapshot = payload.snapshot;
+                                setSnapshot(payload.snapshot);
+                            }
+                            setTranscript('');
+                            setPreview('');
+                            setError('');
+                            setPhase(value => value === 'pausing' ? value : 'listening');
+                            break;
+                        case 'fork.error':
+                            setError(payload.message || 'The connection was interrupted. Please resume the microphone.');
+                            if (payload.recoverableText)
+                                setTranscript(payload.recoverableText);
+                            setPhase(value => value === 'pausing' ? value : 'listening');
+                            break;
+                    }
+                },
+                error: () => { if (token === generation.current)
+                    setError('Connection interrupted. Your saved field is still here.'); },
+                close: () => {
+                    if (token !== generation.current)
+                        return;
+                    const renew = resumeAfterClose.current;
+                    disconnect();
+                    if (renew)
+                        void startAgain.current();
+                },
+            });
+            live.current = connection;
+            await connection.ready;
+            if (token !== generation.current)
+                return;
+            const capture = new MicrophoneCapture({
+                // Update only the tiny meter, without rerendering the whole field for every audio frame.
+                onLevel: level => {
+                    if (token === generation.current)
+                        microphoneLevel.current?.style.setProperty('--microphone-level', String(Math.min(1, level * 3)));
+                },
+                onError: error => { if (token === generation.current) {
+                    disconnect();
+                    setError(messageFor(error));
+                } } });
+            mic.current = capture;
+            await capture.start(connection.socket, granted);
+            if (token !== generation.current) {
+                await capture.stop();
+                return;
+            }
+            capture.setReady(ready.current);
+            connection.send('fork.start', { language: 'en', muted: true, hold: false, mode: 'develop' });
+            // Renew before the server's ten-minute cap, after saving the current thought.
+            const expires = Date.parse(session.expiresAt);
+            if (Number.isFinite(expires))
+                renewTimer.current = setTimeout(() => void pauseForRenewal.current(true), Math.max(1000, expires - Date.now() - 90000));
+        }
+        catch (error) {
+            granted?.getTracks().forEach(track => track.stop());
+            if (token === generation.current) {
+                disconnect();
+                setError(messageFor(error));
+            }
+            if (createdSessionId) void request(`/api/sessions/${encodeURIComponent(createdSessionId)}`, undefined, 'DELETE').catch(() => {});
+        }
+        finally {
+            if (token === generation.current)
+                connecting.current = false;
+        }
+    }, [disconnect]);
+    startAgain.current = start;
+    useEffect(() => {
+        if (!project || !leaseReady || !writable || autoAttempt.current === project.id)
+            return;
+        autoAttempt.current = project.id;
+        void start();
+    }, [project?.id, leaseReady, writable, start]);
+    const pause = async (renew = false) => {
+        clearTimeout(renewTimer.current);
+        resumeAfterClose.current = renew;
+        if (!live.current || !ready.current) {
+            disconnect();
+            return;
+        }
+        const token = generation.current;
+        setPhase('pausing');
+        try {
+            await mic.current?.flush();
+        }
+        catch { /* Retain the transcript if transport failed. */ }
+        await mic.current?.stop();
+        if (token !== generation.current)
+            return;
+        stream.current = null;
+        mic.current = null;
+        live.current?.send('fork.stop');
+        pauseTimer.current = setTimeout(() => {
+            if (token === generation.current) {
+                disconnect();
+                setError('The last thought could not be confirmed. Your saved field is preserved.');
+            }
+        }, 65000);
+    };
+    pauseForRenewal.current = pause;
+    const newConversation = async () => {
+        if (creatingConversation.current || !current.current.project)
+            return;
+        creatingConversation.current = true;
+        setCreating(true);
+        // Invalidate pending speech, analysis and startup callbacks before switching.
+        disconnect();
+        setError('');
+        try {
+            showProject(await createProject('Untitled conversation', 'en'));
+        }
+        catch (error) {
+            setError(messageFor(error));
+        }
+        finally {
+            creatingConversation.current = false;
+            setCreating(false);
+        }
+    };
+    const active = phase === 'listening' || phase === 'thinking';
+    const disabled = !leaseReady || !writable || creating || phase === 'pausing';
+    const status = phase === 'starting' ? 'Connecting microphone' : phase === 'pausing' ? 'Saving your last thought' : active ? 'Microphone on' : 'Microphone off';
+    return <div className="app-shell">
+    <header className="app-logo"><a href="/" className="brand" aria-label="ELSE home">ELSE</a></header>
+    <main><ConversationField field={snapshot?.field} transcript={transcript} preview={preview} thinking={phase === 'thinking'} paused={initialized && phase === 'idle'} microphone={{ disabled, onStart: () => void start() }}/></main>
+    <ConversationPlan projectId={project?.id} field={snapshot?.field} transcript={speechSegments} newConversation={{
+      disabled: creating || !project, busy: creating,
+      title: 'Start a new conversation with a clear transcript, field and plan.',
+      onStart: () => void newConversation(),
+    }} microphone={{
+      active, busy: phase === 'starting' || phase === 'pausing', disabled, status, levelRef: microphoneLevel,
+      label: phase === 'idle' ? 'Resume microphone' : phase === 'starting' ? 'Cancel microphone connection' : 'Pause microphone',
+      onToggle: () => phase === 'idle' ? void start() : void pause(),
+    }}/>
+    {(error || !writable) && <div className="error-toast" role="alert"><span>{!writable ? 'This conversation is being edited in another tab. Close it there, then reload.' : error}</span>{writable && <button onClick={() => setError('')} aria-label="Dismiss message">×</button>}</div>}
+    {initialized && !project && !needCode && <div className="access-dialog"><p>We couldn’t open your conversation.</p><button onClick={() => location.reload()}>Try again</button></div>}
+    {needCode && <form className="access-dialog" onSubmit={async (event) => { event.preventDefault(); try {
+        showProject(await load(code));
+        setNeedCode(false);
+    }
+    catch (error) {
+        setError(messageFor(error));
+    } }}><label htmlFor="access-code">Conversation access code</label><input id="access-code" type="password" value={code} onChange={event => setCode(event.target.value)} autoFocus/><button type="submit">Continue</button></form>}
+  </div>;
 }
-function MicIcon({live}:{live:boolean}){return live?<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>:<svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>}
-function IssueDetails({node,lang,onAction}:{node:NodeVersion;lang:Language;onAction:(s:string)=>unknown}){const a=node.attributes||{};return <div className="issue-details">{[['rationale','Basis'],['consequence','Impact'],['proposedChange','Possible change'],['testSuggestion','How to test']].map(([key,label])=>a[key]&&<div key={key}><h3>{label}</h3><p>{String(a[key])}</p></div>)}<button onClick={()=>onAction(`Create a test for: ${node.title}`)}>{'Create a test'}</button></div>}
-function Compare({project,lang,onSwitch,onMain}:{project:Project;lang:Language;onSwitch:(id:string)=>unknown;onMain:(id:string)=>unknown}){const [left,setLeft]=useState(project.branches[0]?.id||''),[right,setRight]=useState(project.branches[1]?.id||project.branches[0]?.id||'');const a=project.branches.find(b=>b.id===left),b=project.branches.find(b=>b.id===right);const differences=useMemo(()=>{if(!a||!b)return[];const all=new Set([...Object.keys(a.snapshot.nodes),...Object.keys(b.snapshot.nodes)]);return Array.from(all).filter(id=>{const x=a.snapshot.nodes[id],y=b.snapshot.nodes[id];return !x||!y||x.title!==y.title||x.body!==y.body||x.freshness!==y.freshness||x.disposition!==y.disposition})},[a,b]);return <div className="compare"><h2>{'A different path. The same idea.'}</h2><p>{'Compare decisions and consequences while keeping both versions.'}</p>{project.branches.length<2?<div className="compare-empty">{'Open a card and choose “Explore alternative”, or say “What if…”.'}</div>:<div className="compare-grid">{[a,b].map((branch,index)=>branch&&<section key={index}><select value={index?right:left} onChange={e=>(index?setRight:setLeft)(e.target.value)} aria-label={index?'Right branch':'Left branch'}>{project.branches.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select><div className="compare-actions"><button onClick={()=>onSwitch(branch.id)}>{'Explore'}</button><button disabled={Boolean(branch.is_main)} onClick={()=>onMain(branch.id)}>{branch.is_main?'◆ Main':'Make main'}</button></div>{differences.length===0&&<p>{'These branches have matching content.'}</p>}{differences.map(id=>{const n=branch.snapshot.nodes[id];return <article className={!n?'missing':''} key={id}>{n?<><span className="kind">{n.domain} {n.freshness==='needs_review'?' · ↻':''}</span><strong>{n.title}</strong><p>{n.body}</p></>:<p>{'Absent in this branch'}</p>}</article>})}</section>)}</div>}</div>}

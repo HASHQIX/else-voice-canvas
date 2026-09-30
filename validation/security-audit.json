@@ -1,0 +1,54 @@
+{
+  "project": "ELSE",
+  "checkedAtUtc": "2026-09-30T12:55:09.810510+00:00",
+  "purpose": "Credential audit before first publication to HASHQIX/else-voice-canvas",
+  "repository": "https://github.com/HASHQIX/else-voice-canvas",
+  "historyBase": "a1f295505b9c65ca48401be2e6e50dc89a762015",
+  "scope": {
+    "prepublicationCandidateFiles": 127,
+    "localGitCommits": 1,
+    "localGitObjects": 94,
+    "localGitBlobs": 75,
+    "includesAllRefsReflogsAndUnreachableObjects": true,
+    "shallowRepository": false,
+    "browserBuildFiles": 8,
+    "extractedDocumentsAndScreenshots": 22,
+    "knownLocalCredentialValuesCompared": 5,
+    "finalStagedTreeFiles": 128
+  },
+  "results": {
+    "confirmedCredentialLeaks": 0,
+    "exactMatchesToLocalCredentialValues": 0,
+    "defaultGitleaksFindings": 0,
+    "sensitiveFilesInGitHistory": [],
+    "additionalAssignmentRuleFindings": {
+      "currentFiles": 4,
+      "history": 1,
+      "allGitObjects": 1,
+      "disposition": "Only descriptive test signing values in two temporary-database test suites and synthetic provider placeholders in the production smoke runner. Historical/object hits duplicate the integration fixture. None matches local credentials."
+    },
+    "finalStagedDefaultGitleaksFindings": 0,
+    "finalStagedExactCredentialMatches": 0,
+    "finalStagedForbiddenPaths": []
+  },
+  "tools": {
+    "gitleaks": "8.30.1; default rules plus explicit provider/session assignment detection; 100% output redaction; archive depth 3; decode depth 5",
+    "exactMatching": "Local credential values read in memory and compared against publication candidates, every local Git blob/commit/tag and browser build assets; values never printed or written to reports.",
+    "binaryText": "Local macOS Vision OCR for 20 PNGs, PDFKit for one PDF, ZIP/XML extraction for one DOCX; extracted text scanned locally."
+  },
+  "privateLocalFilesExcluded": [
+    ".env",
+    "data/.session-secret",
+    "data/else.sqlite"
+  ],
+  "allowedTemplates": [
+    ".env.example",
+    "PLAN/.env.example"
+  ],
+  "limitations": [
+    "Provider variable names and empty configuration templates are expected public source content; the audit checks credential values.",
+    "Automated patterns, exact-value matching and OCR do not prove the absence of every possible unknown or visually obscured secret.",
+    "No source code, credentials, audio or OCR text was uploaded to an external scanning service.",
+    "Final staged content is checked again immediately before the publication commit."
+  ]
+}

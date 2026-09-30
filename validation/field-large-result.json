@@ -1,0 +1,22 @@
+{
+  "testedAt": "2026-09-30T10:57:45.625Z",
+  "provider": "openrouter",
+  "model": "google/gemini-3.8-flash",
+  "synthetic": true,
+  "cells": 73,
+  "vacancyCounts": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "schemaBytes": 1974,
+  "elapsedMs": 4686,
+  "focus": "Budget",
+  "neighbors": 1,
+  "validated": true
+}

@@ -1,3 +1,4 @@
+import type { ConversationField, FieldProposal } from '../../shared/field.js';
 /** ELSE v1 reference types, not an implemented application. */
 export type Language = "ru" | "en";
 export type Domain = "idea" | "audience" | "situation" | "value" | "trial" | "payment" | "acquisition" | "delivery" | "resources" | "assumption" | "next_step" | "other";
@@ -39,6 +40,7 @@ export interface QuestionProposal {
   options: Array<{ref: string; label: string; meaning: string}>;
 }
 export interface FinalPlan {
+  field?: FieldProposal | null;
   language: Language;
   intent: "develop" | "challenge" | "clarify" | "answer" | "fork" | "navigate" | "defer" | "hold" | "finish" | "no_change";
   statements: StatementProposal[]; links: LinkProposal[];
@@ -57,6 +59,7 @@ export interface NodeVersion {
   attributes: Record<string, unknown>;
 }
 export interface Snapshot {
+  field?: ConversationField;
   schemaVersion: 1; projectId: string; branchId: string; revision: number;
   nodes: Record<string, NodeVersion>;
   navigation: Array<{parentId: string; childId: string}>;

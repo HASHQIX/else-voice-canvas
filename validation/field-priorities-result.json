@@ -1,0 +1,80 @@
+{
+  "testedAt": "2026-09-30T11:54:29.537Z",
+  "synthetic": true,
+  "provider": "openrouter",
+  "model": "google/gemini-3.8-flash",
+  "results": [
+    {
+      "turn": 1,
+      "elapsedMs": 7818,
+      "plan": {
+        "title": "Autumn photoshoot",
+        "summary": "An autumn photoshoot with two models booked for Friday; finalizing budget is needed before booking the studio.",
+        "decisions": [
+          {
+            "text": "Two models are booked.",
+            "sourceQuote": "both models are booked"
+          },
+          {
+            "text": "Friday is confirmed for the shoot.",
+            "sourceQuote": "Friday is confirmed."
+          },
+          {
+            "text": "Two models are needed.",
+            "sourceQuote": "We need two models"
+          }
+        ],
+        "nextSteps": [
+          {
+            "text": "Settle the budget.",
+            "sourceQuote": "We need to settle the budget before anything else."
+          },
+          {
+            "text": "Call the studio once budget is agreed.",
+            "sourceQuote": "I will call the studio once the budget is agreed."
+          }
+        ],
+        "openQuestions": [
+          "What is the total budget for the shoot?",
+          "Which studio will be selected?",
+          "Which backdrop color should be chosen?"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "elapsedMs": 5039,
+      "plan": {
+        "title": "Autumn photoshoot",
+        "summary": "Planning an autumn photoshoot; model availability and Friday date are unconfirmed, with budget blocking studio selection.",
+        "decisions": [
+          {
+            "text": "Two models are needed.",
+            "sourceQuote": "We need two models"
+          }
+        ],
+        "nextSteps": [
+          {
+            "text": "Resolve the budget before selecting a studio.",
+            "sourceQuote": "The budget is still our first blocker; let us resolve it before choosing a studio."
+          },
+          {
+            "text": "Confirm model availability with the agency.",
+            "sourceQuote": "I still need to confirm their availability."
+          },
+          {
+            "text": "Call the studio once budget is agreed.",
+            "sourceQuote": "I will call the studio once the budget is agreed."
+          }
+        ],
+        "openQuestions": [
+          "What is the total budget for the shoot?",
+          "Are the models available?",
+          "What date will be confirmed for the shoot?",
+          "Which studio will be selected?",
+          "Which backdrop color should be chosen?"
+        ]
+      }
+    }
+  ]
+}

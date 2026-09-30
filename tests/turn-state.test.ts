@@ -29,3 +29,26 @@ it('stable deterministic layout preserves root and existing positions without ov
  expect(first.q.y).toBe(first.a.y+first.a.height+112);
  expect(layoutNewNodes({...s,layout:first,nodes:{...s.nodes,b:{kind:'statement'}},navigation:[...s.navigation,{parentId:'r',childId:'b'}]}).a).toEqual(first.a);
 });
+
+it('analyzes a completed prefix while retaining later speech for the next update',()=>{
+ const s=new ThoughtBuffer();
+ s.update({turn_order:1,transcript:'We are planning a photoshoot.',end_of_turn:true});
+ const token=s.completedToken()!;
+ s.update({turn_order:2,transcript:'The models need',end_of_turn:false});
+ expect(s.acceptsCompleted(token)).toBe(true);
+ expect(s.commitCompleted(token)).toBe(true);
+ expect(s.text).toBe('The models need');
+ expect(s.completedToken()).toBeNull();
+ s.update({turn_order:2,transcript:'The models need to be booked for Friday.',end_of_turn:true});
+ expect(s.completedToken()?.text).toBe('The models need to be booked for Friday.');
+ expect(s.update({turn_order:1,transcript:'We are planning a photoshoot.',end_of_turn:true})).toBe(false);
+});
+it('rejects a background plan after a correction or rewritten ASR prefix',()=>{
+ const s=new ThoughtBuffer();
+ s.update({turn_order:1,transcript:'The shoot is Friday.',end_of_turn:true});
+ const token=s.completedToken()!;
+ s.update({turn_order:2,transcript:'Actually it is Saturday.',end_of_turn:false});
+ expect(s.acceptsCompleted(token)).toBe(false);
+ expect(s.commitCompleted(token)).toBe(false);
+ expect(s.text).toContain('Saturday');
+});

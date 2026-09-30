@@ -2,6 +2,7 @@
   "name": "else-app",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=.env --import tsx server/main.ts",
@@ -12,7 +13,8 @@
     "build:server": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json",
     "test": "vitest run",
-    "test:browser": "playwright test",
+    "test:browser": "node --import tsx validation/field-browser.mjs",
+    "test:production": "node validation/production-smoke.mjs",
     "backup": "node --env-file-if-exists=.env --import tsx scripts/backup.ts"
   },
   "dependencies": {

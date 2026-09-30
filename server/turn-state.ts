@@ -1,6 +1,7 @@
 /** ASR Turn is a replacement snapshot. Final segments form one user thought. */
 export type TurnEvent = { turn_order: number; transcript: string; end_of_turn: boolean };
 export type ThoughtToken = { group: number; revision: number; semanticEpoch: number; text: string };
+export type CompletedToken = ThoughtToken & { segments: Array<{ order: number; text: string }> };
 export class ThoughtBuffer {
   private segments = new Map<number, { text: string; final: boolean }>();
   private committedOrders = new Set<number>();
@@ -32,6 +33,33 @@ export class ThoughtBuffer {
   }
   acceptsFinal(token: ThoughtToken): boolean {
     return token.group === this.group && token.revision === this.revision && token.text === this.text && this.allFinal;
+  }
+  /** A stable ASR prefix can be analyzed while later speech keeps arriving. */
+  completedToken(): CompletedToken | null {
+    const segments: CompletedToken['segments'] = [];
+    for (const [order, segment] of [...this.segments].sort(([a], [b]) => a - b)) {
+      if (!segment.final) break;
+      segments.push({ order, text: segment.text });
+    }
+    const text = segments.map(segment => segment.text).join(' ').trim();
+    return text ? { ...this.token(), text, segments } : null;
+  }
+  acceptsCompleted(token: CompletedToken): boolean {
+    if (token.group !== this.group || token.semanticEpoch !== this.semanticEpoch) return false;
+    const current = [...this.segments].sort(([a], [b]) => a - b);
+    return token.segments.every((segment, index) => {
+      const item = current[index];
+      return item?.[0] === segment.order && item[1].final && item[1].text === segment.text;
+    });
+  }
+  commitCompleted(token: CompletedToken): boolean {
+    if (!this.acceptsCompleted(token)) return false;
+    for (const segment of token.segments) {
+      this.committedOrders.add(segment.order);
+      this.segments.delete(segment.order);
+    }
+    this.group++; this.revision = 0; this.semanticEpoch++;
+    return true;
   }
   commit(token: ThoughtToken): boolean {
     if (!this.acceptsFinal(token)) return false;

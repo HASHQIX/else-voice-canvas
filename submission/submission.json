@@ -1,0 +1,39 @@
+{
+  "projectTitle": "ELSE",
+  "shortDescription": "ELSE listens alongside your conversation, surfaces missing questions and blind spots, and turns what you say into a live visual map of what is settled, what needs clarification, and what comes next.",
+  "longDescription": "ELSE is a voice-first conversational canvas designed to help people have better conversations while they are still happening.\n\nELSE listens alongside the participants, identifies missing information, surfaces relevant questions, and continuously organizes the discussion into a visual 3×3 canvas.\n\nThe current topic stays at the center, surrounded by eight relevant questions and directions worth exploring. As the conversation moves, the canvas moves with it. A priority sidebar distinguishes between what has been confirmed, what still needs clarification, and what should happen next.\n\nA live transcript preserves the conversation, while a saved Summary captures confirmed points, unresolved questions, next steps, topic history, and the complete chronological transcript.\n\nELSE is designed for situations where important details can easily be missed: project planning, negotiations, interviews, creative discussions, brainstorming, and everyday decisions.\n\nAssemblyAI Streaming Speech-to-Text provides the real-time speech layer and automatic speaker labels. Google Gemini through OpenRouter analyzes the evolving context and generates questions and priorities while participants continue speaking naturally.",
+  "technologyTags": [
+    "AssemblyAI",
+    "OpenRouter",
+    "Gemini",
+    "React",
+    "TypeScript",
+    "Fastify",
+    "SQLite"
+  ],
+  "categorySuggestions": [
+    "Productivity",
+    "Collaboration"
+  ],
+  "coverImage": "cover.png",
+  "publicGithubUrl": "https://github.com/HASHQIX/else-voice-canvas",
+  "demoPlatform": null,
+  "applicationUrl": null,
+  "videoPresentationUrl": null,
+  "slidePresentationUrl": null,
+  "submissionDraftUrl": null,
+  "teamConfirmed": false,
+  "deadlineUtc": "2026-09-30T15:00:00Z",
+  "deadlineWita": "2026-09-30T23:00:00+08:00",
+  "deliveryStatus": "Public source repository prepared; hosted demo, video, slide presentation and lablab submission are still required.",
+  "notes": [
+    "Labels are session-scoped, not identity recognition.",
+    "Reports require the originating browser cookie; copy the report for external sharing.",
+    "No claim of a deployed application, video, deck, or confirmed lablab team."
+  ],
+  "sources": {
+    "event": "https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon",
+    "submissionGuide": "https://github.com/lablab-ai/community-content/blob/main/blog/en/hackathon-guidelines.mdx",
+    "platformGuide": "https://lablab.ai/guide/ai-hackathons"
+  }
+}

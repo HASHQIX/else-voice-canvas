@@ -30,7 +30,7 @@ export class MicrophoneCapture {
   getSettings() { return this.settings; }
   get active() { return this.stream !== null; }
 
-  async start(socket: WebSocket): Promise<void> {
+  async start(socket: WebSocket, grantedStream?: MediaStream): Promise<void> {
     await this.stop();
     const epoch = ++this.epoch;
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone access requires HTTPS or localhost.');
@@ -41,15 +41,23 @@ export class MicrophoneCapture {
     const context = new AudioContext({ latencyHint: 'interactive' });
     this.context = context;
     try {
-      await context.resume();
-      if (epoch !== this.epoch) { if (context.state !== 'closed') await context.close().catch(() => {}); return; }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
+      // Ask for permission before resuming audio: autoplay policies can suspend resume
+      // until a gesture, which must not prevent the permission prompt from appearing.
+      const stream = grantedStream || await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
       if (epoch !== this.epoch) {
         stream.getTracks().forEach(track => track.stop());
         if (context.state !== 'closed') await context.close().catch(() => {});
         return;
       }
       this.stream = stream;
+      let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          context.resume(),
+          new Promise<never>((_, reject) => { resumeTimer = setTimeout(() => reject(new Error('microphone_gesture_required')), 1800); }),
+        ]);
+      } finally { clearTimeout(resumeTimer); }
+      if (epoch !== this.epoch) return;
       for (const track of stream.getTracks()) track.addEventListener('ended', this.handleTrackEnd);
       navigator.mediaDevices.addEventListener('devicechange', this.handleDeviceChange);
       this.settings = { ...stream.getAudioTracks()[0].getSettings(), contextSampleRate: context.sampleRate, outputSampleRate: 16000 };

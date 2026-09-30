@@ -7,6 +7,11 @@ data/
 !.env.example
 .DS_Store
 *.sqlite*
+**/.session-secret
 playwright-report/
 test-results/
 coverage/
+
+# Generated review ledgers are stored locally by Jev.
+validation/jev-*.json
+validation/field-live-proposals.json

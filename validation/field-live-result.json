@@ -1,0 +1,261 @@
+{
+  "testedAt": "2026-09-30T10:34:32.129Z",
+  "provider": "openrouter",
+  "model": "google/gemini-3.8-flash",
+  "mode": "real configured planner; synthetic conversation; no microphone input",
+  "turns": [
+    {
+      "input": "We are planning an editorial photoshoot for our autumn collection. We need to work out the practical details before we commit to a date.",
+      "elapsedMs": 5805,
+      "focus": "Autumn editorial photoshoot",
+      "summary": "Planning editorial shoot for autumn collection before committing to date.",
+      "plan": {
+        "title": "Autumn collection editorial photoshoot",
+        "summary": "Planning is underway for an autumn collection editorial photoshoot, focusing on practical logistics before locking in a date.",
+        "decisions": [
+          {
+            "text": "Produce an editorial photoshoot for the autumn collection.",
+            "sourceQuote": "We are planning an editorial photoshoot for our autumn collection."
+          }
+        ],
+        "nextSteps": [
+          {
+            "text": "Work out practical details before committing to a shoot date.",
+            "sourceQuote": "We need to work out the practical details before we commit to a date."
+          }
+        ],
+        "openQuestions": [
+          "What specific shoot dates and venue locations are feasible?",
+          "Which creative crew and models need to be booked?",
+          "When will garment samples be ready for the shoot?",
+          "What is the allocated budget for production?"
+        ]
+      },
+      "totalCells": 9,
+      "neighbors": [
+        {
+          "title": "Location scouting",
+          "question": "Will the shoot take place indoors, in a studio, or outdoors?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Target dates",
+          "question": "What target date range best suits collection availability and release?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Model casting",
+          "question": "What model profiles and casting requirements are needed?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Creative concept",
+          "question": "What is the creative direction, mood board, or visual theme?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Styling and samples",
+          "question": "When will garment samples and styling accessories be ready?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Crew requirements",
+          "question": "Which photographer, hair and makeup, and production crew are required?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Budget allocation",
+          "question": "What is the total budget cap for crew, venue, and talent?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Contingency planning",
+          "question": "What backup plan is needed for weather or scheduling delays?",
+          "summary": "",
+          "visited": false
+        }
+      ]
+    },
+    {
+      "input": "Let us focus on booking the models. We need two models for a full day, but nobody has contacted an agency yet.",
+      "elapsedMs": 5502,
+      "focus": "Model casting",
+      "summary": "Two models needed for full day; no agency reached yet.",
+      "plan": {
+        "title": "Autumn collection editorial photoshoot",
+        "summary": "Planning is underway for an autumn collection editorial photoshoot, focusing on practical logistics before locking in a date. Focus has shifted to securing two models for a full day, though agency contact has not started.",
+        "decisions": [
+          {
+            "text": "Produce an editorial photoshoot for the autumn collection.",
+            "sourceQuote": "We are planning an editorial photoshoot for our autumn collection."
+          },
+          {
+            "text": "Book two models for a full day of shooting.",
+            "sourceQuote": "We need two models for a full day"
+          }
+        ],
+        "nextSteps": [
+          {
+            "text": "Work out practical details before committing to a shoot date.",
+            "sourceQuote": "We need to work out the practical details before we commit to a date."
+          },
+          {
+            "text": "Contact model agencies to book two models.",
+            "sourceQuote": "nobody has contacted an agency yet."
+          }
+        ],
+        "openQuestions": [
+          "Which specific agencies should be contacted for casting?",
+          "What target dates and location will be selected?",
+          "When will garment samples and styling accessories be ready?",
+          "What is the allocated budget for talent and production?"
+        ]
+      },
+      "totalCells": 14,
+      "neighbors": [
+        {
+          "title": "Autumn editorial photoshoot",
+          "question": "",
+          "summary": "Planning editorial shoot for autumn collection before committing to date.",
+          "visited": true
+        },
+        {
+          "title": "Target dates",
+          "question": "What target date range best suits collection availability and release?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Styling and samples",
+          "question": "When will garment samples and styling accessories be ready?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Agency outreach",
+          "question": "Which modeling agencies should be contacted for rate cards and portfolios?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Usage rights",
+          "question": "What usage terms, territories, and licensing duration are needed for models?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Fitting schedule",
+          "question": "Will models need an advance fitting session prior to shoot day?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Backup options",
+          "question": "What backup options exist if selected models become unavailable?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Compensation budget",
+          "question": "What is the allocated budget cap for both models?",
+          "summary": "",
+          "visited": false
+        }
+      ]
+    },
+    {
+      "input": "The studio is already booked for Friday. For the models, we still need to agree on their rates and availability.",
+      "elapsedMs": 6700,
+      "focus": "Model casting",
+      "summary": "Model rates and availability remain to be agreed upon.",
+      "plan": {
+        "title": "Autumn collection editorial photoshoot",
+        "summary": "Planning an autumn collection editorial photoshoot. The studio is confirmed and booked for Friday. Two models are required for the full day, but their rates and availability still need to be finalized.",
+        "decisions": [
+          {
+            "text": "Produce an editorial photoshoot for the autumn collection.",
+            "sourceQuote": "We are planning an editorial photoshoot for our autumn collection."
+          },
+          {
+            "text": "Book two models for a full day of shooting.",
+            "sourceQuote": "We need two models for a full day"
+          },
+          {
+            "text": "Studio is booked for Friday.",
+            "sourceQuote": "The studio is already booked for Friday."
+          }
+        ],
+        "nextSteps": [
+          {
+            "text": "Agree on model rates and availability.",
+            "sourceQuote": "we still need to agree on their rates and availability."
+          }
+        ],
+        "openQuestions": [
+          "Which specific agencies should be contacted for casting?",
+          "When will garment samples and styling accessories be ready?",
+          "What is the total budget cap for crew, venue, and talent?",
+          "What backup options exist if selected models become unavailable?"
+        ]
+      },
+      "totalCells": 14,
+      "neighbors": [
+        {
+          "title": "Autumn editorial photoshoot",
+          "question": "",
+          "summary": "Planning editorial shoot for autumn collection before committing to date.",
+          "visited": true
+        },
+        {
+          "title": "Target dates",
+          "question": "What target date range best suits collection availability and release?",
+          "summary": "Shoot scheduled for Friday at the booked studio.",
+          "visited": true
+        },
+        {
+          "title": "Styling and samples",
+          "question": "When will garment samples and styling accessories be ready?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Agency outreach",
+          "question": "Which modeling agencies should be contacted for rate cards and portfolios?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Usage rights",
+          "question": "What usage terms, territories, and licensing duration are needed for models?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Fitting schedule",
+          "question": "Will models need an advance fitting session prior to shoot day?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Backup options",
+          "question": "What backup options exist if selected models become unavailable?",
+          "summary": "",
+          "visited": false
+        },
+        {
+          "title": "Compensation budget",
+          "question": "What is the allocated budget cap for both models?",
+          "summary": "",
+          "visited": false
+        }
+      ]
+    }
+  ]
+}

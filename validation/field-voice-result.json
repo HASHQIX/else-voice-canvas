@@ -1,0 +1,28 @@
+{
+  "testedAt": "2026-09-30T10:52:45.371Z",
+  "mode": "Real browser AudioWorklet capture of synthetic English speech, real AssemblyAI and configured planner",
+  "title": "Japan trip planning",
+  "questions": [
+    "Target dates\n\nWhich specific weeks or months in spring fit your schedules?",
+    "Key destinations\n\nWhich regions or cities do you want to explore?",
+    "Accommodation style\n\nWhat types of lodging best match your preferences?",
+    "Trip budget\n\nWhat total or daily spending limit are you targeting?",
+    "Internal transit\n\nHow will you travel between cities, such as by rail pass?",
+    "Activity priorities\n\nWhat experiences or sights are essential for your itinerary?",
+    "Travel documents\n\nDo you need to check passport validity or visa requirements?",
+    "Luggage logistics\n\nHow will you manage luggage while moving between cities?"
+  ],
+  "transcripts": [
+    "We",
+    "We are planning a trip to Japan.",
+    "We are planning a trip to Japan for 2 weeks next month.",
+    "We are planning a trip to Japan for 2 weeks next spring. We",
+    "We are planning a trip to Japan for 2 weeks next spring. We have not decided on the",
+    "We are planning a trip to Japan for 2 weeks next spring. We have not decided on the dates or booked any hotels.",
+    "We are planning a trip to Japan for 2 weeks next spring. We have not decided on the dates or booked any hotels yet.",
+    "We are planning a trip to Japan for 2 weeks next spring. We have not decided on the dates or booked any hotels yet. We want to work through the",
+    "We are planning a trip to Japan for 2 weeks next spring. We have not decided on the dates or booked any hotels yet. We want to work through the practical details together.",
+    ""
+  ],
+  "errors": []
+}

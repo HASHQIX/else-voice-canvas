@@ -41,6 +41,55 @@ const command=async(type:string,payload:any={},extra:any={})=>app.inject({method
 const turn=async(extra:any={})=>app.inject({method:'POST',url:`/api/projects/${project.id}/text-turns`,headers:{cookie,'x-else-client-id':clientId},payload:{text:'I want a concept tool for small studios.',language:'en',branchId:branch().id,expectedRevision:branch().revision,operationId:crypto.randomUUID(),muted:true,clientId,...extra}});
 
 describe('persisted final pipeline and security',()=>{
+ it('exports an immutable owner-only report with full speech and deletes it with its conversation',async()=>{
+  const ownerId=store.db.prepare('SELECT owner_id FROM projects WHERE id=?').get(project.id).owner_id;
+  const session=store.createSession(ownerId,project.id,branch().id);
+  const words='Complete transcript with no export cutoff. '.repeat(200);
+  store.saveSpeechSegment(ownerId,project.id,session.id,'0',words,true,'B');
+  const snapshot=branch().snapshot;
+  snapshot.field={focusId:'topic',cells:{topic:{id:'topic',x:0,y:0,title:'Photoshoot',summary:'Friday is confirmed.',question:'',visited:true}},plan:{title:'Autumn photoshoot',summary:'A Friday shoot.',decisions:[{text:'Friday confirmed.',sourceQuote:'Friday confirmed'}],nextSteps:[],openQuestions:['What is the budget?']}};
+  store.db.prepare('UPDATE branches SET snapshot=? WHERE id=?').run(JSON.stringify(snapshot),branch().id);
+  const created=await app.inject({method:'POST',url:`/api/projects/${project.id}/reports`,headers:{cookie},payload:{}});
+  expect(created.statusCode).toBe(201);
+  const {id,url}=created.json();expect(url).toBe(`/report/${id}`);
+  const read=()=>app.inject({url:`/api/reports/${id}`,headers:{cookie}});
+  const before=await read();expect(before.headers['cache-control']).toBe('private, no-store');
+  expect(before.json().report).toMatchObject({title:'Autumn photoshoot',decisions:['Friday confirmed.'],openQuestions:['What is the budget?'],inProgress:true,transcript:[{text:words,speaker:'B',sessionId:session.id}]});
+  store.saveSpeechSegment(ownerId,project.id,session.id,'0','Later correction',true);
+  await app.inject({method:'POST',url:'/api/projects',headers:{cookie},payload:{title:'New conversation'}});
+  expect((await read()).json()).toEqual(before.json());
+  const guest=await app.inject({method:'POST',url:'/api/guest',remoteAddress:`127.0.0.${++guestCounter}`,payload:{}});
+  const other=guest.headers['set-cookie'].split(';')[0];
+  expect((await app.inject({url:`/api/reports/${id}`})).statusCode).toBe(401);
+  expect((await app.inject({url:`/api/reports/${id}`,headers:{cookie:other}})).statusCode).toBe(404);
+  expect((await app.inject({method:'POST',url:`/api/projects/${project.id}/reports`,headers:{cookie:other},payload:{}})).statusCode).toBe(404);
+  await app.inject({method:'DELETE',url:`/api/projects/${project.id}`,headers:{cookie}});
+  expect((await read()).statusCode).toBe(404);
+ });
+ it('does not create a report for an empty conversation',async()=>{
+  const result=await app.inject({method:'POST',url:`/api/projects/${project.id}/reports`,headers:{cookie},payload:{}});
+  expect(result.statusCode).toBe(400);expect(result.json().error).toBe('empty_conversation');
+ });
+ it('stores full speech across sessions and restricts transcript history to its owner',async()=>{
+  const ownerId=store.db.prepare('SELECT owner_id FROM projects WHERE id=?').get(project.id).owner_id;
+  const one=store.createSession(ownerId,project.id,branch().id),two=store.createSession(ownerId,project.id,branch().id);
+  const words='Complete speech without a display-length cutoff. '.repeat(20);
+  store.saveSpeechSegment(ownerId,project.id,one.id,'0','Complete speech',false,'UNKNOWN');
+  store.saveSpeechSegment(ownerId,project.id,one.id,'0',words,true,'A');
+  store.saveSpeechSegment(ownerId,project.id,one.id,'0','Stale partial',false,'UNKNOWN');
+  store.saveSpeechSegment(ownerId,project.id,two.id,'0','Another sentence after resuming.',true,'B');
+  const history=await app.inject({url:`/api/projects/${project.id}/transcript`,headers:{cookie}});
+  expect(history.json().segments.map((segment:any)=>segment.text)).toEqual([words,'Another sentence after resuming.']);
+  expect(history.json().segments.map((segment:any)=>segment.speaker)).toEqual(['A','B']);
+  expect(history.json().segments.map((segment:any)=>segment.sessionId)).toEqual([one.id,two.id]);
+  expect(store.speechContextFor(ownerId,project.id,`${one.id}:0`).map((segment:any)=>segment.text)).toEqual([words]);
+  const stranger=await app.inject({method:'POST',url:'/api/guest',remoteAddress:`127.0.0.${++guestCounter}`,payload:{}});
+  const denied=await app.inject({url:`/api/projects/${project.id}/transcript`,headers:{cookie:stranger.headers['set-cookie'].split(';')[0]}});
+  expect(denied.statusCode).toBe(404);
+  expect((await app.inject({url:`/api/projects/${project.id}/transcript`})).statusCode).toBe(401);
+  await app.inject({method:'DELETE',url:`/api/projects/${project.id}`,headers:{cookie}});
+  expect(store.db.prepare('SELECT COUNT(*) AS count FROM speech_segments WHERE project_id=?').get(project.id).count).toBe(0);
+ });
  it('saves validated final + question; D10 restores server snapshot; D14 mute never calls TTS',async()=>{
   const result=await turn();expect(result.statusCode,result.body).toBe(200);const data=result.json();expect(data.snapshot.revision).toBe(1);expect(data.snapshot.pendingQuestionId).toBeTruthy();expect(llmCalls).toBe(1);expect(ttsCalls).toBe(0);expect(data.replyId).toBeNull();
   const restored=await app.inject({method:'GET',url:`/api/projects/${project.id}`,headers:{cookie}});expect(restored.json().branches[0].snapshot).toEqual(data.snapshot);
@@ -101,4 +150,105 @@ describe('persisted final pipeline and security',()=>{
    if(previous===undefined)delete process.env.DAILY_LLM_BUDGET_USD;else process.env.DAILY_LLM_BUDGET_USD=previous;
   }
  });
+});
+
+describe('blind spot pivot', () => {
+ it('persists nine cells, moves voice-selected focus, fills only new space, restores and undoes the camera', async () => {
+  transform = (plan, input) => ({ ...plan, statements: [], links: [], issues: [], question: null, assistantText: '', focusRef: null,
+   field: { updates: [], targetId: null, title: 'Photoshoot planning', summary: 'Planning a photoshoot.', sourceQuote: input.text,
+    plan: {title:'Photoshoot plan',summary:'Planning a photoshoot.',decisions:[],nextSteps:[],openQuestions:['Who will model?']},
+    neighbors: ['Model booking','Studio','Budget','Dates','Usage rights','Creative direction','Crew','Contingencies'].map(title => ({ title, question: `What do we need to clarify about ${title.toLowerCase()}?` })) } });
+  const first = await turn({ text: 'We are planning a photoshoot.' });
+  expect(first.statusCode, first.body).toBe(200);
+  const original = first.json().snapshot.field;
+  expect(Object.keys(original.cells)).toHaveLength(9);
+  const model = Object.values(original.cells).find((cell: any) => cell.title === 'Model booking') as any;
+  transform = (plan, input) => {
+   expect(input.conversationField.focusId).toBe(original.focusId);
+   expect(input.conversationField.plan).toEqual(original.plan);
+   expect(input.conversationField.cells.find((cell: any) => cell.id === model.id).vacancies).toBe(5);
+   return { ...plan, statements: [], links: [], issues: [], question: null, assistantText: '', focusRef: null,
+    field: { updates: [], targetId: model.id, title: 'Model booking', summary: 'Two models are needed.', sourceQuote: input.text,
+     plan: {title:'Photoshoot plan',summary:'A photoshoot with two models.',decisions:[{text:'Two models are needed.',sourceQuote:'book two models'}],nextSteps:[{text:'Book two models.',sourceQuote:'book two models'}],openQuestions:['Are both models available?']},
+     neighbors: ['Availability','Agency','Rates','Releases','Backup models'].map(title => ({ title, question: `What about ${title.toLowerCase()}?` })) } };
+  };
+  const second = await turn({ text: 'Now let us book two models.' });
+  expect(second.statusCode, second.body).toBe(200);
+  const moved = second.json().snapshot.field;
+  expect(moved.plan.nextSteps).toEqual([{text:'Book two models.',sourceQuote:'book two models'}]);
+  expect(moved.focusId).toBe(model.id);
+  expect(Object.keys(moved.cells)).toHaveLength(14);
+  for (const cell of Object.values(original.cells) as any[]) expect(moved.cells[cell.id]).toMatchObject({ x: cell.x, y: cell.y });
+  const restored = (await app.inject({ url: `/api/projects/${project.id}`, headers: { cookie } })).json().branches[0].snapshot.field;
+  expect(restored).toEqual(moved);
+  expect((await command('undo')).json().snapshot.field).toEqual(original);
+  expect((await command('redo')).json().snapshot.field).toEqual(moved);
+ });
+ it('rejects a field with missing questions after one repair without saving a partial grid', async () => {
+  transform = (plan, input) => ({ ...plan, field: { updates: [], targetId: null, title: 'Photoshoot', summary: 'Planning a shoot.', sourceQuote: input.text, neighbors: [] } });
+  const result = await turn();
+  expect(result.statusCode, result.body).toBe(422);
+  expect(llmCalls).toBe(2);
+  expect(branch().snapshot.field).toBeUndefined();
+  expect(branch().revision).toBe(0);
+ });
+});
+
+it('can cancel an unopened voice session and immediately start another',async()=>{
+ const first=(await app.inject({method:'POST',url:`/api/projects/${project.id}/sessions`,headers:{cookie},payload:{clientId,branchId:branch().id}})).json();
+ const cancelled=await app.inject({method:'DELETE',url:`/api/sessions/${first.id}`,headers:{cookie}});
+ expect(cancelled.statusCode,cancelled.body).toBe(200);
+ const second=await app.inject({method:'POST',url:`/api/projects/${project.id}/sessions`,headers:{cookie},payload:{clientId,branchId:branch().id}});
+ expect(second.statusCode,second.body).toBe(201);
+ await app.inject({method:'DELETE',url:`/api/sessions/${second.json().id}`,headers:{cookie}});
+});
+
+it.each([true,false])('validates compact Gemini neighbor counts before saving (repair succeeds: %s)',async(repairSucceeds)=>{
+ vi.stubEnv('LLM_PROVIDER','openrouter');
+ vi.stubEnv('OPENROUTER_API_KEY','router-test-credential');
+ vi.stubEnv('LLM_MODEL','google/gemini-3.8-flash');
+ vi.stubGlobal('fetch',vi.fn(async(_url:string,options:any)=>{
+  llmCalls++;
+  const body=JSON.parse(options.body),input=JSON.parse(body.messages[1].content).context;
+  expect(body.response_format.json_schema.schema.properties.field.anyOf).toHaveLength(2);
+  const count=llmCalls===2&&repairSucceeds?8:7;
+  const field={targetId:null,title:'Shoot planning',summary:'Plan a shoot.',sourceQuote:input.text,updates:[],plan:{title:'Shoot planning',summary:'Plan a shoot.',decisions:[],nextSteps:[],openQuestions:[]},neighbors:Array.from({length:count},(_,i)=>({title:`Question ${i}`,question:'What needs clarifying?'}))};
+  return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({field})}}]}));
+ }));
+ try {
+  const result=await turn();
+  expect(llmCalls).toBe(2);
+  expect(result.statusCode).toBe(repairSucceeds?200:422);
+  expect(branch().revision).toBe(repairSucceeds?1:0);
+  if(repairSucceeds)expect(Object.keys(branch().snapshot.field.cells)).toHaveLength(9);
+  else expect(branch().snapshot.field).toBeUndefined();
+ } finally {vi.unstubAllEnvs();}
+});
+
+it.each(['openai','openrouter'])('normalizes and persists the narrow field response through %s',async(provider)=>{
+ vi.stubEnv('LLM_PROVIDER',provider);
+ vi.stubEnv('OPENROUTER_API_KEY','fake-router-test-key');
+ vi.stubEnv('LLM_MODEL','google/gemini-3.8-flash');
+ vi.stubGlobal('fetch',vi.fn(async(url:string,options:any)=>{
+  const body=JSON.parse(options.body),input=JSON.parse((provider==='openrouter'?body.messages:body.input)[1].content).context;
+  const format=provider==='openrouter'?body.response_format.json_schema:body.text.format;
+  expect(format.strict).toBe(true);
+  expect(format.schema.required).toEqual(['field']);
+  if(provider==='openrouter'){
+   expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+   expect(options.headers.Authorization).toBe('Bearer fake-router-test-key');
+   expect(body.model).toBe('google/gemini-3.8-flash');
+  }
+  const field={targetId:null,title:'Conversation planning',summary:input.text,sourceQuote:input.text,updates:[],plan:{title:'Conversation planning',summary:input.text,decisions:[],nextSteps:[],openQuestions:[]},neighbors:Array.from({length:8},(_,i)=>({title:`Angle ${i+1}`,question:`What should we clarify for angle ${i+1}?`}))};
+  return new Response(JSON.stringify(provider==='openrouter'
+   ?{choices:[{finish_reason:'stop',message:{content:JSON.stringify({field})}}]}
+   :{output:[{content:[{type:'output_text',text:JSON.stringify({field})}]}]}));
+ }));
+ try{
+  const result=await turn();expect(result.statusCode,result.body).toBe(200);
+  expect(Object.keys(result.json().snapshot.field.cells)).toHaveLength(9);
+  expect(result.json().plan.statements).toEqual([]);
+  const restored=await app.inject({url:`/api/projects/${project.id}`,headers:{cookie}});
+  expect(restored.json().branches[0].snapshot.field).toEqual(result.json().snapshot.field);
+ }finally{vi.unstubAllEnvs();}
 });

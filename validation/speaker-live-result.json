@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "model": "universal-3-6-pro",
+  "speakers": [
+    "A",
+    "B"
+  ],
+  "turns": [
+    {
+      "text": "We are planning a trip to Japan next spring. How many days should we spend in Tokyo, and what is our total budget?",
+      "final": true,
+      "segmentId": "0",
+      "speaker": "A"
+    },
+    {
+      "text": "I would like to spend 5 days in Tokyo. My budget is $2,000, and I can travel during the first week of April.",
+      "final": true,
+      "segmentId": "1",
+      "speaker": "B"
+    },
+    {
+      "text": "We are planning a trip to Japan next spring. How many days should we spend in Tokyo, and what is our total budget?",
+      "final": true,
+      "segmentId": "2",
+      "speaker": "A"
+    },
+    {
+      "text": "I would like to spend 5 days in Tokyo. My budget is $2,000, and I can travel during the first week of April.",
+      "final": true,
+      "segmentId": "3",
+      "speaker": "B"
+    }
+  ]
+}

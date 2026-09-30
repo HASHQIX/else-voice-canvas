@@ -1,13 +1,16 @@
+import type { ConversationField } from '../shared/field.js';
+import type { SpeechSegment } from '../shared/transcript.js';
 export type NodeVersion = {logicalId:string;versionId:string;kind:string;domain:string;title:string;body:string;origin:string;disposition:string;evidence:string;freshness:string;locked:boolean;sourceRefs?:Array<{turnId:string;quote:string}>;attributes?:Record<string,any>};
-export type Snapshot={schemaVersion:1;projectId:string;branchId:string;revision:number;nodes:Record<string,NodeVersion>;navigation:Array<{parentId:string;childId:string}>;dependencies:Array<any>;layout:Record<string,{x:number;y:number;width:number;height:number}>;pendingQuestionId:string|null};
+export type Snapshot={schemaVersion:1;projectId:string;branchId:string;revision:number;nodes:Record<string,NodeVersion>;navigation:Array<{parentId:string;childId:string}>;dependencies:Array<any>;layout:Record<string,{x:number;y:number;width:number;height:number}>;pendingQuestionId:string|null;field?:ConversationField};
 export type Project={id:string;title:string;branches:Array<{id:string;label:string;revision:number;is_main:number;snapshot:Snapshot}>};
 export class ApiError extends Error {constructor(public code:string,public status:number,public details:any){super(details.message||code)}}
 export const clientId=(()=>{const id=sessionStorage.getItem('else.client')||crypto.randomUUID();sessionStorage.setItem('else.client',id);return id})();
 export async function request(path:string,body?:unknown,method?:string){const r=await fetch(path,{method:method||(body===undefined?'GET':'POST'),credentials:'same-origin',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify({...((body&&typeof body==='object')?body:{}),clientId})});const value=await r.json().catch(()=>({}));if(!r.ok)throw new ApiError(value.error||`http_${r.status}`,r.status,value);return value;}
-export async function createGuest(code?:string){return request('/api/guest',{code})}
+export async function createGuest(code?:string){return request('/api/guest',{accessCode:code})}
 export async function listProjects():Promise<Project[]>{const r=await request('/api/projects');return Array.isArray(r)?r:r.projects||[]}
 export async function createProject(title:string,language:string):Promise<Project>{return request('/api/projects',{title,language})}
 export async function getProject(id:string):Promise<Project>{return request(`/api/projects/${encodeURIComponent(id)}`)}
+export async function getTranscript(id:string):Promise<{segments:SpeechSegment[]}>{return request(`/api/projects/${encodeURIComponent(id)}/transcript`)}
 export async function sendTextTurn(projectId:string,text:string,branchId:string,language:string,muted:boolean,mode:string,expectedRevision:number,questionId?:string){return request(`/api/projects/${encodeURIComponent(projectId)}/text-turns`,{text,branchId,language,muted,mode,expectedRevision,questionId,operationId:crypto.randomUUID()})}
 export async function sendCommand(projectId:string,type:string,payload:any,branchId:string,expectedRevision:number){return request(`/api/projects/${encodeURIComponent(projectId)}/commands`,{type,payload,operationId:crypto.randomUUID(),projectId,branchId,expectedRevision,contextEpoch:0})}
 export async function createSession(projectId:string,branchId:string,language:string){return request(`/api/projects/${encodeURIComponent(projectId)}/sessions`,{branchId,language})}

@@ -366,6 +366,186 @@
           "type": "null"
         }
       ]
+    },
+    "field": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 280
+            },
+            "sourceQuote": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 600
+            },
+            "neighbors": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "question": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "title",
+                  "question"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "updates": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "targetId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 280
+                  },
+                  "sourceQuote": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 600
+                  }
+                },
+                "required": [
+                  "targetId",
+                  "summary",
+                  "sourceQuote"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "plan": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 800
+                },
+                "decisions": {
+                  "type": "array",
+                  "maxItems": 12,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 240
+                      },
+                      "sourceQuote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 600
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "sourceQuote"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "nextSteps": {
+                  "type": "array",
+                  "maxItems": 12,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 240
+                      },
+                      "sourceQuote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 600
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "sourceQuote"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "openQuestions": {
+                  "type": "array",
+                  "maxItems": 12,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 240
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "summary",
+                "decisions",
+                "nextSteps",
+                "openQuestions"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "targetId",
+            "title",
+            "summary",
+            "sourceQuote",
+            "neighbors",
+            "updates"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   },
   "required": [
