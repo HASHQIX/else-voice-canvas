@@ -1,0 +1,53 @@
+{
+  "type": "object",
+  "properties": {
+    "ideaTitle": {
+      "type": "string"
+    },
+    "ideaSummary": {
+      "type": "string"
+    },
+    "draftItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "audience",
+              "value",
+              "situation",
+              "payment",
+              "acquisition",
+              "other"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "sourceQuote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot",
+          "title",
+          "body",
+          "sourceQuote"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "ideaTitle",
+    "ideaSummary",
+    "draftItems"
+  ],
+  "additionalProperties": false,
+  "title": "FORK live semantic preview v1"
+}

@@ -1,0 +1,12 @@
+.git
+.tools
+node_modules
+dist
+data
+.env
+.env.*
+validation
+test-results
+playwright-report
+PLAN/spec
+*.sqlite*

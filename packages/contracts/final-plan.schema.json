@@ -1,0 +1,385 @@
+{
+  "type": "object",
+  "properties": {
+    "language": {
+      "type": "string",
+      "enum": [
+        "ru",
+        "en"
+      ]
+    },
+    "intent": {
+      "type": "string",
+      "enum": [
+        "develop",
+        "challenge",
+        "clarify",
+        "answer",
+        "fork",
+        "navigate",
+        "defer",
+        "hold",
+        "finish",
+        "no_change"
+      ]
+    },
+    "statements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "targetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "idea",
+              "statement",
+              "experiment",
+              "note"
+            ]
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "idea",
+              "audience",
+              "situation",
+              "value",
+              "trial",
+              "payment",
+              "acquisition",
+              "delivery",
+              "resources",
+              "assumption",
+              "next_step",
+              "other"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "selected"
+            ]
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turnId": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "turnId",
+                "quote"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "requestedLock": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ref",
+          "targetId",
+          "kind",
+          "domain",
+          "title",
+          "body",
+          "disposition",
+          "sourceRefs",
+          "requestedLock"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sourceRef": {
+            "type": "string"
+          },
+          "targetRef": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "depends_on",
+              "supports",
+              "challenges",
+              "requires",
+              "tests"
+            ]
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceRef",
+          "targetRef",
+          "kind",
+          "label"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "gap",
+              "tension"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "relatedRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "consequence": {
+            "type": "string"
+          },
+          "proposedChange": {
+            "type": "string"
+          },
+          "testSuggestion": {
+            "type": "string"
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turnId": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "turnId",
+                "quote"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "title",
+          "relatedRefs",
+          "rationale",
+          "consequence",
+          "proposedChange",
+          "testSuggestion",
+          "sourceRefs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "branchIntent": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "switch_view",
+                "set_main"
+              ]
+            },
+            "sourceBranchId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "targetBranchId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "forkNodeId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "label": {
+              "type": "string"
+            },
+            "exploreNow": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action",
+            "sourceBranchId",
+            "targetBranchId",
+            "forkNodeId",
+            "label",
+            "exploreNow"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "question": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string"
+            },
+            "targetRef": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "meaning": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "label",
+                  "meaning"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "ref",
+            "targetRef",
+            "prompt",
+            "reason",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "assistantText": {
+      "type": "string"
+    },
+    "focusRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "language",
+    "intent",
+    "statements",
+    "links",
+    "issues",
+    "branchIntent",
+    "question",
+    "assistantText",
+    "focusRef"
+  ],
+  "additionalProperties": false,
+  "title": "ELSE final semantic proposal v1"
+}

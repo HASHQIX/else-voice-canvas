@@ -1,0 +1,14 @@
+services:
+  else:
+    build: .
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /data/else.sqlite
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - else-data:/data
+    restart: unless-stopped
+volumes:
+  else-data:

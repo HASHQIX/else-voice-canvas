@@ -1,0 +1,6 @@
+# Replace with the owner-provided domain. This configuration is not a deployment.
+else.example.com {
+  reverse_proxy 127.0.0.1:3000 {
+    flush_interval -1
+  }
+}

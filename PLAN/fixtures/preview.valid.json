@@ -1,0 +1,12 @@
+{
+  "ideaTitle": "Visual concepts for studios",
+  "ideaSummary": "An application that turns references into several visual directions.",
+  "draftItems": [
+    {
+      "slot": "audience",
+      "title": "First user",
+      "body": "Small design studios.",
+      "sourceQuote": "only for small studios"
+    }
+  ]
+}

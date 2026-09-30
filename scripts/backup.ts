@@ -1,0 +1,11 @@
+import Database from 'better-sqlite3';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
+const source=process.env.DATABASE_PATH||'./data/else.sqlite';
+const target=process.argv[2]||`./data/backups/else-${new Date().toISOString().replace(/[:.]/g,'-')}.sqlite`;
+await mkdir(path.dirname(target),{recursive:true});
+const db=new Database(source,{readonly:true});
+await db.backup(target);db.close();
+const restored=new Database(target,{readonly:true});
+if(restored.pragma('integrity_check',{simple:true})!=='ok')throw new Error('Backup integrity check failed');
+restored.close();console.log(`Verified WAL-safe backup: ${target}`);

@@ -1,0 +1,19 @@
+{
+  "scope": "English translation of documentation and reference assets only; no application or live API tested",
+  "date": "2026-09-30",
+  "edition": "English translation of specification version 1.0",
+  "pdf_pages": 27,
+  "schema_examples": "PASS: local jsonschema validation",
+  "source_quotes": "PASS: English example quotes occur in the translated fixture transcript",
+  "reference_types": "PASS: tsc --noEmit --strict --skipLibCheck --target ES2022 contracts/types.ts",
+  "translation_structure": "PASS: numbered headings, table row counts, and source URLs match the original",
+  "unchanged_reference_assets": "PASS: schemas, TypeScript types, prompts, validation script, contracts README, and env example preserved byte-for-byte",
+  "language_check": "PASS: document copy, fixture copy, and handoff instructions are in English; RU/EN application support is unchanged",
+  "rendering": "PASS: all 27 pages visually inspected; PDF text checked for replacement characters and out-of-page bounds",
+  "acceptance_cases": 42,
+  "acceptance_ids": "PASS: all IDs match the original",
+  "acceptance_status": "NOT_RUN: the developer must implement and execute application acceptance tests",
+  "live_provider_smoke": "NOT_RUN: no live provider calls were made for this translation",
+  "performance_targets": "NOT_MEASURED: targets, not achieved benchmarks",
+  "source_verification": "Inherited reference date from the original specification; not repeated for the translation"
+}

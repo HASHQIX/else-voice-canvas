@@ -1,0 +1,53 @@
+{
+  "name": "else-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --import tsx server/main.ts",
+    "build": "npm run build:server && npm run build:client",
+    "start": "node --env-file-if-exists=.env dist/server/main.js",
+    "dev:client": "vite",
+    "build:client": "tsc -p tsconfig.web.json && vite build",
+    "build:server": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "backup": "node --env-file-if-exists=.env --import tsx scripts/backup.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/cors": "11.3.0",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/rate-limit": "11.2.0",
+    "@fastify/static": "10.1.5",
+    "@fastify/websocket": "11.3.1",
+    "@xyflow/react": "^12.3.6",
+    "ajv": "8.20.0",
+    "better-sqlite3": "13.0.3",
+    "fastify": "5.12.5",
+    "openai": "^4.73.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "24.19.0",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "6.1.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  },
+  "engines": {
+    "node": "24.21.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

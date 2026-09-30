@@ -1,0 +1,68 @@
+{
+  "language": "en",
+  "intent": "develop",
+  "statements": [
+    {
+      "ref": "idea_1",
+      "targetId": "root",
+      "kind": "idea",
+      "domain": "idea",
+      "title": "Concepts from references",
+      "body": "An application that helps design studios create several visual directions from references.",
+      "disposition": "selected",
+      "sourceRefs": [
+        {
+          "turnId": "turn_001",
+          "quote": "an app that helps create several visual directions from references"
+        }
+      ],
+      "requestedLock": null
+    },
+    {
+      "ref": "audience_1",
+      "targetId": null,
+      "kind": "statement",
+      "domain": "audience",
+      "title": "Small studios",
+      "body": "Small design studios are selected as the first users.",
+      "disposition": "selected",
+      "sourceRefs": [
+        {
+          "turnId": "turn_001",
+          "quote": "only for small studios"
+        }
+      ],
+      "requestedLock": null
+    }
+  ],
+  "links": [
+    {
+      "sourceRef": "audience_1",
+      "targetRef": "idea_1",
+      "kind": "depends_on",
+      "label": "Features are refined for the audience"
+    }
+  ],
+  "issues": [],
+  "branchIntent": null,
+  "question": {
+    "ref": "q_1",
+    "targetRef": "audience_1",
+    "prompt": "Who in the studio would use the tool first?",
+    "reason": "This will help choose the first use case.",
+    "options": [
+      {
+        "ref": "opt_designer",
+        "label": "Designer",
+        "meaning": "A designer prepares the first concepts."
+      },
+      {
+        "ref": "opt_director",
+        "label": "Art director",
+        "meaning": "An art director defines directions for the team."
+      }
+    ]
+  },
+  "assistantText": "This version focuses on small studios. Who in the studio would use the tool first?",
+  "focusRef": "q_1"
+}

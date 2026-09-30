@@ -1,0 +1,79 @@
+{
+  "description": "Synthetic test stream, not a recording of the real API. Arrival times are used by the fake adapter. Dialogue translated into English for this edition.",
+  "context": {
+    "projectId": "project_demo",
+    "branchId": "branch_main",
+    "branchRevision": 0,
+    "contextEpoch": 1,
+    "turnGroupId": "turn_001",
+    "streamEpoch": 1
+  },
+  "events": [
+    {
+      "atMs": 0,
+      "providerEvent": {
+        "type": "Begin",
+        "id": "fixture-session"
+      }
+    },
+    {
+      "atMs": 400,
+      "providerEvent": {
+        "type": "SpeechStarted",
+        "timestamp": 300
+      }
+    },
+    {
+      "atMs": 1000,
+      "providerEvent": {
+        "type": "Turn",
+        "turn_order": 0,
+        "end_of_turn": false,
+        "transcript": "I want an app that helps create"
+      }
+    },
+    {
+      "atMs": 2300,
+      "providerEvent": {
+        "type": "Turn",
+        "turn_order": 0,
+        "end_of_turn": false,
+        "transcript": "I want an app that helps create several visual directions from references. Initially for all designers"
+      }
+    },
+    {
+      "atMs": 3900,
+      "providerEvent": {
+        "type": "Turn",
+        "turn_order": 0,
+        "end_of_turn": false,
+        "transcript": "I want an app that helps create several visual directions from references. Initially for all designers, no, only for small studios."
+      }
+    },
+    {
+      "atMs": 5100,
+      "providerEvent": {
+        "type": "Turn",
+        "turn_order": 0,
+        "end_of_turn": true,
+        "transcript": "I want an app that helps create several visual directions from references. Initially for all designers, no, only for small studios."
+      }
+    },
+    {
+      "atMs": 5150,
+      "providerEvent": {
+        "type": "Turn",
+        "turn_order": 0,
+        "end_of_turn": true,
+        "transcript": "I want an app that helps create several visual directions from references. Initially for all designers, no, only for small studios."
+      }
+    }
+  ],
+  "expected": {
+    "finalText": "I want an app that helps create several visual directions from references. Initially for all designers, no, only for small studios.",
+    "finalGroupCount": 1,
+    "commitCount": 1,
+    "selectedAudience": "Small studios",
+    "rejectedSelectedAudience": "All designers"
+  }
+}

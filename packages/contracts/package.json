@@ -1,0 +1,11 @@
+{
+  "name": "@else/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./types": "./types.ts",
+    "./preview.schema.json": "./preview.schema.json",
+    "./final-plan.schema.json": "./final-plan.schema.json"
+  }
+}

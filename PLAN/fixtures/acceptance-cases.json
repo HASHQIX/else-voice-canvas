@@ -1,0 +1,299 @@
+{
+  "description": "Specifications for future tests. NOT_RUN does not indicate execution.",
+  "cases": [
+    {
+      "id": "A01",
+      "given": "Empty project, real STT/LLM/TTS",
+      "when": "Speak for 12–15 seconds",
+      "then": "A semantic draft appears before speech ends; one question appears after finalization.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A02",
+      "given": "Draft with designers as the audience",
+      "when": "Say \"no, only for small studios\"",
+      "then": "There is one selected audience; an old preview does not reappear.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A03",
+      "given": "Hold is enabled",
+      "when": "Pause mid-thought",
+      "then": "No question appears until explicit completion.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A04",
+      "given": "A group final has been received",
+      "when": "Repeat the final with the same key",
+      "then": "One group and one transaction.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A05",
+      "given": "Several partial snapshots",
+      "when": "Send an expanded/corrected version",
+      "then": "Text is replaced; prefixes are not duplicated.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A06",
+      "given": "TTS is playing",
+      "when": "SpeechStarted arrives",
+      "then": "Playback stops; late audio chunks are ignored.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A07",
+      "given": "There is no single current yes/no question",
+      "when": "Say \"yes\"",
+      "then": "Clarification instead of arbitrary agreement.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A08",
+      "given": "Russian UI, RU/EN STT",
+      "when": "Switch to English terms",
+      "then": "The UI language does not change automatically; meaning is preserved.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A09",
+      "given": "Preview is slower than partial updates",
+      "when": "Continue speaking without pauses",
+      "then": "A compatible preview can appear; there is no starvation.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A10",
+      "given": "A correction cue has been received",
+      "when": "An old preview arrives",
+      "then": "The epoch check rejects the old proposal.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B01",
+      "given": "A branch with subscription pricing",
+      "when": "Create a per-project payment alternative",
+      "then": "The source is unchanged; the new branch is separate.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B02",
+      "given": "A and B have both been explored",
+      "when": "Return to A",
+      "then": "B is retained; A is restored.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B03",
+      "given": "Payment depends on the audience",
+      "when": "Change the audience",
+      "then": "Payment is marked needs_review, not deleted.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B04",
+      "given": "Final A is in flight",
+      "when": "Switch to B, then receive A's response",
+      "then": "No mutation of B and no camera return.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B05",
+      "given": "Manual edit and final share one revision",
+      "when": "Execute concurrently",
+      "then": "One commits; the other conflicts and is replanned.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B06",
+      "given": "A saved edit",
+      "when": "Undo, then redo",
+      "then": "Content is restored; revision increases.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B07",
+      "given": "A condition is locked",
+      "when": "The agent proposes changing it",
+      "then": "No change without explicit, specifically addressed permission.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B08",
+      "given": "Branches with similar titles",
+      "when": "Open comparison",
+      "then": "Different versions are not merged; there is no ranking.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B09",
+      "given": "Two requests with operationId X",
+      "when": "Repeat the command",
+      "then": "The same acknowledgement is returned without a second event.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "B10",
+      "given": "A branch was created from revision 4",
+      "when": "Change the parent later",
+      "then": "The child snapshot does not change automatically.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C01",
+      "given": "100 nodes",
+      "when": "Receive partials",
+      "then": "The draft store updates, not the whole graph.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C02",
+      "given": "The camera is moving toward A",
+      "when": "Click B",
+      "then": "A new animation starts from the current position toward B, without queueing.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C03",
+      "given": "The user has manually panned",
+      "when": "A new question arrives",
+      "then": "FOLLOW is off; a return button is available.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C04",
+      "given": "Long Russian text",
+      "when": "Open the card and inspector",
+      "then": "No overlap; the complete text is accessible.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C05",
+      "given": "Reduced motion and keyboard input",
+      "when": "Complete the main loop",
+      "then": "All actions are available without animation or a mouse.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C06",
+      "given": "Five start/stop cycles",
+      "when": "Stop the last session",
+      "then": "No remaining tracks, STT connections, or growing queues.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C07",
+      "given": "AudioContext at 48 kHz",
+      "when": "Send a test tone",
+      "then": "STT receives real PCM16 at 16 kHz, not relabeled 48 kHz audio.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C08",
+      "given": "A PCM chunk with an odd byte length",
+      "when": "The next chunk arrives",
+      "then": "The unpaired byte is carried over; audio is not distorted.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D01",
+      "given": "A spoken thought is unfinished",
+      "when": "Disconnect the network",
+      "then": "The committed graph is intact; the partial requires confirmation.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D02",
+      "given": "Invalid JSON",
+      "when": "One repair runs and fails again",
+      "then": "No partial commit; the utterance is available as text.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D03",
+      "given": "The database returns an error",
+      "when": "Complete analysis",
+      "then": "No \"saved\" confirmation; the draft remains.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D04",
+      "given": "TTS returns 503",
+      "when": "The question is already saved",
+      "then": "Text is available; the graph is not rolled back.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D05",
+      "given": "Owner B",
+      "when": "Request owner A's project/audio",
+      "then": "403/404 without content.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D06",
+      "given": "The budget is exhausted",
+      "when": "Attempt to continue live interaction",
+      "then": "No paid requests; open STT closes.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D07",
+      "given": "User prompt injection",
+      "when": "Request a key or execution",
+      "then": "No secret, shell access, or arbitrary tools.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D08",
+      "given": "No market sources",
+      "when": "Request the market size",
+      "then": "No invented statistics; state a hypothesis/test explicitly.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D09",
+      "given": "60+20+60 with a limit of 120",
+      "when": "Run the deterministic check",
+      "then": "Result 140, shortfall 20, and a source for every number.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D10",
+      "given": "The latest commit is saved",
+      "when": "Reload",
+      "then": "Snapshot, branch, and sensible focus are restored.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D11",
+      "given": "A second editor tab",
+      "when": "Request takeover",
+      "then": "The old lease is invalidated; its jobs cannot commit.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D12",
+      "given": "A project was deleted",
+      "when": "Open its old ID/local cache",
+      "then": "No access; cache is deleted; no silent restoration.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D13",
+      "given": "An incorrect sourceQuote",
+      "when": "Propose a final plan",
+      "then": "Validation rejects the source; evidence is not upgraded.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D14",
+      "given": "Response audio is muted",
+      "when": "Receive a new question",
+      "then": "No TTS request is made; the microphone still works.",
+      "status": "NOT_RUN"
+    }
+  ]
+}
