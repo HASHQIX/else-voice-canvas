@@ -53,6 +53,27 @@ it('parses previews from chat completions using the preview schema', async () =>
   expect(body.max_tokens).toBe(600);
 });
 
+it('uses separate small native schemas and token limits without duplicating schema or repair data in the system prompt', async () => {
+  respond(reply('{"field":null}'));
+  const repair = { proposal: { field: { targetId: 'bad-reference' } }, errors: 'Unknown field focus' };
+  await structuredResponse('fast', { text: 'We need a studio.' }, undefined, repair);
+  const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+  expect(body.max_tokens).toBe(1200);
+  expect(body.response_format.json_schema.name).toBe('else_fast');
+  const schema = body.response_format.json_schema.schema;
+  expect(schema.properties.field.anyOf[1].properties.neighbors.maxItems).toBe(3);
+  expect(schema.properties.field.anyOf[1].properties).not.toHaveProperty('plan');
+  expect(body.messages[0].content).not.toContain(JSON.stringify(schema));
+  expect(body.messages[0].content).not.toContain('bad-reference');
+  expect(JSON.parse(body.messages[1].content)).toMatchObject(repair);
+  const plan = { title: 'Shoot', summary: 'Planning.', decisions: [], nextSteps: [], openQuestions: [] };
+  respond(reply(JSON.stringify({ plan })));
+  expect(await structuredResponse('recap', { previousPlan: null, turns: [] })).toEqual({ plan });
+  const recap = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+  expect(recap.max_tokens).toBe(2400);
+  expect(recap.response_format.json_schema.name).toBe('else_recap');
+});
+
 it('uses a compact schema for large Gemini fields while preserving exact-schema routing for other models',async()=>{
  const input={text:'Plan a shoot.',conversationField:{newTopicVacancies:7,cells:Array.from({length:73},(_,i)=>({id:`cell-${i}`,vacancies:i%8}))}};
  respond(reply('{"field":null}'));

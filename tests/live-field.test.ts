@@ -35,17 +35,23 @@ it('commits a background thought while speech continues, then processes retained
   const finalInputs: any[] = [];
   vi.stubGlobal('fetch', vi.fn(async (_url: string, options: any) => {
     const body = JSON.parse(options.body), input = JSON.parse(body.messages[0].content).context;
-    if (body.tools[0].name === 'else_preview') return new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'else_preview', input: { ideaTitle: 'Photoshoot', ideaSummary: '', draftItems: [] } }] }));
+    if (body.tools[0].name === 'else_recap') return new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'else_recap', input: { plan: {
+      title: 'Autumn photoshoot', summary: 'Planning an autumn photoshoot with two models.', decisions: [], nextSteps: [], openQuestions: ['Are the models available?'],
+    } } }] }));
+    expect(body.tools[0].name).toBe('else_fast');
     finalInputs.push(input);
     if (finalInputs.length === 1) await new Promise<void>((resolve, reject) => {
       release = resolve;
       options.signal.addEventListener('abort', () => reject(new Error('Unexpected cancellation of a completed thought')), { once: true });
     });
     const target = input.conversationField.cells.find((cell: any) => cell.title === 'Model booking');
-    const titles = target ? ['Availability', 'Agency', 'Rates', 'Releases', 'Backups'] : ['Model booking', 'Studio', 'Budget', 'Dates', 'Rights', 'Direction', 'Crew', 'Contingencies'];
-    const plan = { language: 'en', intent: 'develop', statements: [], links: [], issues: [], question: null, branchIntent: null, assistantText: '', focusRef: null,
-      field: { targetId: target?.id || null, title: target?.title || 'Photoshoot planning', summary: input.text, sourceQuote: input.text, updates: [], neighbors: titles.map(title => ({ title, question: `What about ${title}?` })) } };
-    return new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'else_final', input: plan }] }));
+    const titles = target ? ['Availability', 'Agency', 'Rates'] : ['Model booking', 'Studio', 'Budget', 'Dates', 'Rights', 'Crew', 'Style', 'Backup'];
+    const neighborSchema = body.tools[0].input_schema.properties.field.anyOf[1].properties.neighbors;
+    expect(neighborSchema.maxItems).toBe(input.conversationField.isInitial ? 8 : 3);
+    if (input.conversationField.isInitial) expect(neighborSchema.minItems).toBe(8);
+    const plan = {
+      field: { targetId: target?.id || null, title: target?.title || 'Photoshoot planning', summary: input.text, sourceQuote: input.text, updates: [], questionUpdates: [], neighbors: titles.map(title => ({ title, question: `What about ${title}?` })) } };
+    return new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'else_fast', input: plan }] }));
   }));
   const guest = await app.inject({ method: 'POST', url: '/api/guest', payload: {} });
   const cookie = guest.headers['set-cookie'].split(';')[0];
@@ -70,9 +76,14 @@ it('commits a background thought while speech continues, then processes retained
   expect(finalInputs[0].speakerTurns).toEqual([{text:firstText,speaker:'Person 1',sessionId:session.id}]);
   expect(finalInputs[1].speakerTurns).toEqual([{text:firstText,speaker:'Person 1',sessionId:session.id},{text:nextText,speaker:'Person 2',sessionId:session.id}]);
   expect(commits[0].payload.snapshot.field.cells[commits[0].payload.snapshot.field.focusId].title).toBe('Photoshoot planning');
+  expect(Object.keys(commits[0].payload.snapshot.field.cells)).toHaveLength(9);
+  expect(finalInputs.map(input => input.conversationField.isInitial)).toEqual([true, false]);
   const field = commits[1].payload.snapshot.field;
   expect(field.cells[field.focusId].title).toBe('Model booking');
-  expect(Object.keys(field.cells)).toHaveLength(14);
+  expect(Object.keys(field.cells)).toHaveLength(12);
+  expect(field.planPending).toBe(true);
+  expect(field.plan).toBeUndefined();
+  expect(finalInputs.every(input => !input.sources && !input.snapshot)).toBe(true);
   expect(messages.filter(message => message.type === 'fork.error')).toEqual([]);
   expect(messages.some(message => message.type === 'fork.transcript' && message.payload.text === nextText)).toBe(true);
   const transcript=await app.inject({url:`/api/projects/${project.id}/transcript`,headers:{cookie}});
@@ -82,5 +93,56 @@ it('commits a background thought while speech continues, then processes retained
   expect(transcript.json().segments.map((segment:any)=>segment.speaker)).toEqual(['A','B']);
   expect(transcript.json().segments.every((segment:any)=>segment.sessionId===session.id)).toBe(true);
   expect(messages.filter(message=>message.type==='fork.speech_segment')).toHaveLength(3);
+  await until(() => messages.some(message => message.type === 'fork.plan'));
+  const recap = messages.find(message => message.type === 'fork.plan').payload.snapshot;
+  expect(recap.field.planPending).toBe(false);
+  expect(recap.field.cells).toEqual(field.cells);
+  expect(recap.field.plan.title).toBe('Autumn photoshoot');
+  ws.close();
+}, 12000);
+
+it('repairs one invalid fast proposal with its original evidence and rejects a cancelled late response', async () => {
+  const inputs: any[] = [];
+  let release: (() => void) | undefined;
+  vi.stubGlobal('fetch', vi.fn(async (_url: string, options: any) => {
+    const body = JSON.parse(options.body), request = JSON.parse(body.messages[0].content);
+    inputs.push(request);
+    if (inputs.length === 3) await new Promise<void>(resolve => { release = resolve; }); // Simulate a provider ignoring abort.
+    const text = request.context.text;
+    const field = { targetId: request.context.conversationField.focusId, title: 'Photoshoot', summary: 'Planning a shoot.',
+      sourceQuote: inputs.length === 1 ? 'Invented booking confirmation' : text, updates: [], questionUpdates: [],
+      neighbors: inputs.length === 3 ? [] : ['Budget', 'Models', 'Studio', 'Dates', 'Rights', 'Crew', 'Style', 'Backup'].map(title => ({ title, question: `What about ${title}?` })) };
+    return new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'else_fast', input: { field } }] }));
+  }));
+  const guest = await app.inject({ method: 'POST', url: '/api/guest', payload: {} });
+  const cookie = guest.headers['set-cookie'].split(';')[0];
+  const project = (await app.inject({ method: 'POST', url: '/api/projects', headers: { cookie }, payload: { title: 'Repair test' } })).json();
+  const branchId = project.branches[0].id;
+  const session = (await app.inject({ method: 'POST', url: `/api/projects/${project.id}/sessions`, headers: { cookie }, payload: { branchId, clientId: 'repair-test' } })).json();
+  const ws = await app.injectWS(`/api/live/${session.id}`, { headers: { cookie } });
+  const messages: any[] = [];
+  ws.on('message', (data: Buffer) => messages.push(JSON.parse(data.toString())));
+  ws.send(JSON.stringify({ protocolVersion: 1, type: 'fork.start', sessionId: session.id, payload: { muted: true } }));
+  await until(() => messages.some(message => message.type === 'fork.ready'));
+  stream.onTranscript({ text: 'We need to plan a photoshoot.', final: true, segmentId: '1', speaker: 'A' });
+  await until(() => messages.some(message => message.type === 'fork.committed'));
+  expect(inputs).toHaveLength(2);
+  expect(inputs[1].proposal.field.sourceQuote).toBe('Invented booking confirmation');
+  expect(inputs[1].errors).toContain('quote');
+  const snapshot = messages.find(message => message.type === 'fork.committed').payload.snapshot;
+  stream.onTranscript({ text: 'Actually we need a completely different date.', final: true, segmentId: '2', speaker: 'A' });
+  await until(() => Boolean(release));
+  const owner = store.db.prepare('SELECT owner_id FROM projects WHERE id=?').get(project.id).owner_id;
+  // A valid manual command invalidates the active analysis and its recap job.
+  const root = Object.keys(snapshot.nodes)[0];
+  const command = await app.inject({ method: 'POST', url: `/api/projects/${project.id}/commands`, headers: { cookie }, payload: {
+    type: 'edit_node', clientId: 'repair-test', branchId, expectedRevision: snapshot.revision, payload: { nodeId: root, title: 'Manual change' },
+  } });
+  expect(command.statusCode).toBe(200);
+  release!();
+  await new Promise(resolve => setTimeout(resolve, 100));
+  expect(messages.filter(message => message.type === 'fork.committed')).toHaveLength(1);
+  expect(store.getBranch(owner, project.id, branchId).snapshot.nodes[root].title).toBe('Manual change');
+  expect(store.getBranch(owner, project.id, branchId).snapshot.field.planPendingTurnIds).toEqual([messages.find(message => message.type === 'fork.committed').payload.turnId]);
   ws.close();
 });

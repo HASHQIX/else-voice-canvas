@@ -29,28 +29,38 @@
 :is(.cell-copy p,.focus-caption),.empty-center p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-height:none}
 /* The clipped dark surface includes a matching light copy, so the moving edge
    inverts each letter precisely as it passes. Only the base copy is accessible. */
-.focus-fill{position:absolute;inset:0;padding:inherit;display:flex;flex-direction:column;gap:inherit;background:#303030;color:#f7f6f2;pointer-events:none;clip-path:inset(0);animation:focus-fill-down 1000ms cubic-bezier(.65,0,.25,1) 1280ms both}
+.focus-fill{position:absolute;inset:0;padding:inherit;display:flex;flex-direction:column;gap:inherit;background:#303030;color:#f7f6f2;pointer-events:none;clip-path:inset(0);animation:focus-fill-down 320ms cubic-bezier(.22,.7,.2,1) both}
 @keyframes focus-fill-down{from{clip-path:inset(0 0 100%)}to{clip-path:inset(0)}}
-.field-camera[data-text-ready=false] .focus-fill{animation-play-state:paused}
-.empty-microphone{flex-shrink:0;max-width:100%;margin-top:12px;padding:10px 16px;border:1px solid #f7f6f280;border-radius:5px;background:transparent;color:inherit;font-size:12px;line-height:1.4;transition:background 180ms ease,border-color 180ms ease}
-.empty-microphone:hover:not(:disabled){background:#f7f6f210;border-color:#f7f6f2}
-.empty-microphone:focus-visible{outline-color:#f7f6f2;outline-offset:4px}
-@media(max-width:520px){.empty-microphone{font-size:10px;padding:8px 6px;margin-top:6px}}
-/* Title first, then its caption: a short downward settle from a soft blur. */
-@keyframes topic-text-enter{
-  from{opacity:0;filter:blur(6px);transform:translateY(-12px)}
-  to{opacity:1;filter:blur(0);transform:translateY(0)}
-}
-.field-cell[data-visible=true] :is(.cell-copy h2,.focus-title),.empty-center h1{animation:topic-text-enter 720ms cubic-bezier(.22,.7,.2,1) 180ms both}
-.field-cell[data-visible=true] :is(.cell-copy p,.focus-caption),.empty-center p{animation:topic-text-enter 720ms cubic-bezier(.22,.7,.2,1) 440ms both}
-/* New copy waits invisibly until the camera arrives, then runs its own stagger. */
-.field-camera[data-text-ready=false] :is(.cell-copy h2,.focus-title),.field-camera[data-text-ready=false] :is(.cell-copy p,.focus-caption){animation-play-state:paused}
+/* Arrival's speaking face and three-second welcome pulse, adapted to the dark tile. */
+.conversation-invitation{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;flex-shrink:0;width:100%;max-width:270px;min-height:44px;padding:12px 0;border:0;border-radius:4px;background:transparent;color:inherit;text-align:center}
+.conversation-invitation-caption{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;font-weight:400;font-style:italic;letter-spacing:1.6px;line-height:1.75;text-transform:uppercase;animation:invitation-pulse 3s ease-in-out infinite}
+.conversation-invitation .conversation-face{display:block;flex-shrink:0;width:37.7px;height:auto;fill:currentColor;stroke:none}
+button.conversation-invitation:hover:not(:disabled) .conversation-invitation-caption,button.conversation-invitation:focus-visible .conversation-invitation-caption{animation:none;opacity:1}
+.conversation-invitation:focus-visible{outline-color:#f7f6f2;outline-offset:5px}
+@keyframes invitation-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+@media(max-width:520px){.conversation-invitation{gap:18px;padding:8px 0}.conversation-invitation-caption{font-size:9px;letter-spacing:.8px;line-height:1.7}.conversation-invitation .conversation-face{width:28.6px}}
+/* Stable text remains readable through updates and camera movement. Only the
+   changed card gets a brief surface cue; sibling text never remounts or fades. */
+.cell-update{position:absolute;inset:0;pointer-events:none;opacity:0;background:#3030300b;animation:cell-attention 420ms ease-out both}
+@keyframes cell-attention{from{opacity:1}to{opacity:0}}
 @keyframes speech-text-enter{
   from{opacity:0;filter:blur(3px);transform:translateY(-6px)}
   to{opacity:1;filter:blur(0);transform:translateY(0)}
 }
 /* A stable segment keeps its entrance when ASR corrects the words in place. */
 .transcript-scroll p[data-segment-id]:first-child{animation:speech-text-enter 420ms cubic-bezier(.22,.7,.2,1) both}
+/* Only newly introduced cards enter; refinements and camera pans retain their text. */
+.field-board,.empty-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr))}
+.field-world-grid{inset:0;background-size:calc(100% / 3) calc(100% / 3)}
+.field-board>.field-cell{position:relative;min-width:0;min-height:0;overflow:hidden;display:block;perspective:1000px;transition:none;background:#f7f6f2}
+.field-board>.field-cell.current{background:#303030;color:#f7f6f2}
+.card-turn{position:absolute;inset:0;padding:inherit;transform-style:preserve-3d}
+.card-turn[data-turning=true]{animation:card-flip 700ms cubic-bezier(.45,0,.2,1) both}
+.card-face{position:absolute;inset:0;padding:inherit;display:flex;flex-direction:column;justify-content:center;background:#f7f6f2;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.current .card-face{background:#303030;color:#f7f6f2}
+.card-back{transform:rotateY(180deg)}
+@keyframes card-flip{from{transform:rotateY(0)}to{transform:rotateY(180deg)}}
+@media(prefers-reduced-motion:reduce){.card-turn[data-turning=true]{transform:rotateY(180deg)}}
 /* The plan is 20% wider; the nine main tiles share a compact inset on every side. */
 .app-shell{--plan-width:min(24vw,480px);--field-inset:32px;--shell-gutter:32px}
 .app-shell{--card-copy-inset:28px}
@@ -150,3 +160,5 @@
 .report-transcript h2{margin-bottom:8px}
 @media(max-width:520px){.report-page{padding:0 18px 40px}.report-toolbar{padding:16px 0;gap:10px}.report-toolbar button{padding:8px 10px}.report-document{margin-top:32px}.report-section p,.report-section li{font-size:14px}}
 @media print{html,body,#root{height:auto;overflow:visible}.report-page{position:static;overflow:visible;padding:0;background:white}.report-toolbar,.report-copy-status{display:none}.report-document{margin:0;max-width:none}.report-section h2,.report-topic h3{break-after:avoid}}
+
+.plan-refresh-status{font-size:11px;opacity:.6;margin:0 0 12px;}

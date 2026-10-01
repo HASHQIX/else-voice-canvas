@@ -4,9 +4,9 @@
 
 ELSE is a voice-first conversational canvas that listens alongside you, surfaces blind spots and missing questions, and turns live conversations into a visual map of what is settled, what still needs clarification, and what should happen next.
 
-ELSE works while the conversation is happening. A live 3×3 canvas keeps the current topic in the center and surrounds it with eight relevant questions and directions worth exploring.
+ELSE works while the conversation is happening. A live 3×3 canvas keeps the current topic in the center. The first meaningful response fills all eight surrounding cells with relevant questions. Later thoughts refine that field or add up to three questions as the discussion develops.
 
-As the discussion moves, the canvas moves with it. ELSE preserves the transcript, distinguishes suggestions from confirmed decisions, and organizes the conversation into **To clarify**, **Next steps**, and **Settled** in the priority sidebar.
+As the discussion moves, the canvas stays still so the conversation remains easy to read. The current topic is always in the center; surrounding cards retain their positions while new content arrives through a short 3D flip. ELSE preserves the transcript, distinguishes suggestions from confirmed decisions, and organizes the conversation into **To clarify**, **Next steps**, and **Settled** in the priority sidebar.
 
 Afterward, a saved Summary captures confirmed points, unresolved questions, next steps, topic history, and the full chronological transcript.
 
@@ -67,6 +67,22 @@ Voice is the source of the conversation itself, while the canvas becomes its evo
 The transcript is the input. ELSE’s output is a continuously changing shared view of the conversation: what matters now, what may have been missed, what has been decided, and what should be explored next.
 
 ELSE helps people shape the conversation while it is still happening.
+
+### Fast questions and background memory
+
+Live voice uses a short field request: current speech, at most six recent complete speaker turns within 2,400 characters, the current topic and its neighbors, up to three older topics matched by shared words, and brief plan memory. It does not resend the whole graph or parallel copies of the transcript. The native structured-output schema is sent once.
+
+The first fast response creates the topic and exactly eight blind spots. Later fast responses update the topic and add up to three questions, and can refine up to two unanswered adjacent questions without moving their cards. Existing topic IDs, coordinates, source quotes and history are preserved. This begins after AssemblyAI finalizes a speech turn, even while later speech continues; partial transcripts remain visible but are not saved as confirmed ideas. Unclear/filler speech may leave the board empty until a meaningful topic is available.
+
+On the canvas, all nine opening cells appear together as soon as the first response arrives, with the existing 420 ms fade-and-slide entrance. Subsequent visible recommendations arrive one at a time, 2.5 seconds apart. A recently displayed question has a 3-second reading window before another wording replaces it; rapid changes coalesce to the newest version. Facts, corrections and the current topic bypass this presentation queue. New cards receive the entrance animation once; refinements never restart it or move the board. Updated cards receive a brief surface highlight while their old and new faces are held inside the same slot. Reopened conversations appear immediately; reduced-motion preferences disable staged reveals and animations. New conversations cancel pending updates and get a fresh complete opening. This presentation layer adds no model requests and never changes saved history.
+
+The board uses nine stationary slots. The center changes with the active topic; a side-card replacement keeps the old face visible while the new face turns in with a 700 ms 3D flip. After the turn completes, the new side card remains readable for at least ten seconds. Additional eligible side cards are paced 2.5 seconds apart, while the center and factual corrections can update immediately. Reset, reload and reduced-motion paths settle without replaying stale animations.
+
+The cumulative plan runs separately, normally after four seconds without another field commit, with a twelve-second coalescing window when capacity permits. Fast analysis takes priority and cancels an overlapping recap. A recap processes at most twelve committed turns / 8,000 characters per batch, retaining the previous plan. Its response cannot overwrite a newer revision, undo, project reset or different editor. Background updates enrich the current history entry rather than consuming an Undo step.
+
+The sidebar shows current questions immediately and labels a pending summary. Provider failure leaves the saved field intact; a later thought or microphone restart retries pending memory work. A deliberate microphone pause can still receive the saved recap through bounded polling. Reports exported before a pending recap finishes are marked incomplete. The legacy text-turn endpoint retains its synchronous full-plan contract.
+
+Earlier synthetic real-LLM measurements on October 1, 2026, using the former three-question opening: first questions **3.05 s** versus **7.56 s** for the full-plan request; with 73 saved cards, **3.67 s** versus **23.19 s** in that run. The large-field context fell from **28,122 to 5,961 bytes**. These are individual observations, not latency guarantees or microphone-to-screen measurements; the current eight-question opening has a larger output and API latency varies. See `validation/fast-live-result.json`. Run `node --env-file-if-exists=.env --import tsx validation/fast-live.mjs` to repeat against the configured provider with synthetic text and the normal budget ledger.
 
 **ELSE doesn't just remember what was said. It helps you see what still needs to be said.**
 

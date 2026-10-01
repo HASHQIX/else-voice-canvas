@@ -1,0 +1,19 @@
+{
+  "testedAt": "2026-10-01T14:24:12.155Z",
+  "mode": "Chromium with synthetic microphone and mocked provider events; no paid provider calls",
+  "caption": "Tap to begin a conversation",
+  "pulseSeconds": 3,
+  "iconSource": "Arrival welcome screen",
+  "iconScale": 0.65,
+  "checks": [
+    "idle invitation",
+    "active and connecting copy",
+    "real interim text replaces invitation",
+    "keyboard start",
+    "permission retry by click",
+    "reduced motion",
+    "desktop/mobile fit",
+    "existing voice and field regression suite"
+  ],
+  "pageErrors": []
+}

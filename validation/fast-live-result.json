@@ -1,0 +1,433 @@
+{
+  "testedAt": "2026-10-01T07:59:01.802Z",
+  "provider": "openrouter",
+  "model": "google/gemini-3.8-flash",
+  "mode": "Real LLM; synthetic transcript; no microphone or STT latency included. Final uses new nonduplicated schema prompt, so comparison is conservative.",
+  "results": [
+    {
+      "scenario": "First thought",
+      "kind": "final",
+      "elapsedMs": 7557,
+      "contextBytes": 843,
+      "repairs": [],
+      "field": {
+        "targetId": null,
+        "title": "Autumn editorial photoshoot",
+        "summary": "Autumn shoot needs two models; studio unbooked and budget open.",
+        "sourceQuote": "We are planning an editorial photoshoot for our autumn collection. We need two models for a full day, but no studio is booked and the budget is still open.",
+        "neighbors": [
+          {
+            "title": "Model selection",
+            "question": "What agency or casting criteria will you use for the models?"
+          },
+          {
+            "title": "Studio booking",
+            "question": "What studio dimensions or lighting setup does the shoot require?"
+          },
+          {
+            "title": "Budget allocation",
+            "question": "What is the overall spending limit across crew, talent, and space?"
+          },
+          {
+            "title": "Shoot dates",
+            "question": "What target shoot dates align with the autumn launch timeline?"
+          },
+          {
+            "title": "Creative direction",
+            "question": "What mood, styling concepts, or shot lists are defined?"
+          },
+          {
+            "title": "Crew staffing",
+            "question": "Who will handle hair, makeup, styling, and photography?"
+          },
+          {
+            "title": "Usage rights",
+            "question": "Where will the images run, and what licensing terms are needed?"
+          },
+          {
+            "title": "Contingency planning",
+            "question": "What backup options exist if talent or venues fall through?"
+          }
+        ],
+        "updates": [],
+        "plan": {
+          "title": "Autumn editorial photoshoot",
+          "summary": "Planning an autumn collection editorial photoshoot requiring two models for a full day, with studio booking and budget still unresolved.",
+          "decisions": [
+            {
+              "text": "The shoot is an editorial photoshoot for the autumn collection.",
+              "sourceQuote": "We are planning an editorial photoshoot for our autumn collection."
+            },
+            {
+              "text": "Two models are needed for a full day.",
+              "sourceQuote": "We need two models for a full day"
+            }
+          ],
+          "nextSteps": [],
+          "openQuestions": [
+            "What is the total budget for the photoshoot?",
+            "Which studio will be booked for the full day?",
+            "When is the target date for the shoot?",
+            "Who will source and cast the two models?",
+            "What crew members need to be hired?"
+          ]
+        }
+      }
+    },
+    {
+      "scenario": "First thought",
+      "kind": "fast",
+      "elapsedMs": 3051,
+      "contextBytes": 549,
+      "repairs": [],
+      "field": {
+        "targetId": null,
+        "title": "Autumn Editorial Photoshoot",
+        "summary": "Planning an autumn collection editorial shoot needing two full-day models, studio, and budget.",
+        "sourceQuote": "We are planning an editorial photoshoot for our autumn collection. We need two models for a full day, but no studio is booked and the budget is still open.",
+        "neighbors": [
+          {
+            "title": "Studio Location Selection",
+            "question": "What location or studio aesthetic fits the autumn collection?"
+          },
+          {
+            "title": "Budget Cap Determination",
+            "question": "What is the maximum expenditure limit for the shoot?"
+          },
+          {
+            "title": "Model Casting Criteria",
+            "question": "What specific look or styling requirements are needed for the models?"
+          }
+        ],
+        "updates": [],
+        "questionUpdates": []
+      }
+    },
+    {
+      "scenario": "73 saved cells",
+      "kind": "final",
+      "elapsedMs": 23187,
+      "contextBytes": 28122,
+      "repairs": [],
+      "field": {
+        "targetId": "f95d31e9-03bf-427d-b919-bcd7d507f5b5",
+        "title": "Model booking",
+        "summary": "Checking Friday availability and usage fees before confirming models.",
+        "sourceQuote": "Let us focus on booking the models. We need to check their Friday availability and usage fees before we choose anyone.",
+        "neighbors": [
+          {
+            "title": "Agency outreach",
+            "question": "Which agencies or casting directors will be contacted for options?"
+          },
+          {
+            "title": "Usage terms",
+            "question": "What distribution channels and licensing duration are required?"
+          },
+          {
+            "title": "Backup talent",
+            "question": "Who will be on standby if preferred models become unavailable?"
+          },
+          {
+            "title": "Fitting schedule",
+            "question": "When and where will wardrobe fittings take place prior to Friday?"
+          },
+          {
+            "title": "Day rate limits",
+            "question": "What is the maximum acceptable rate per model for the full day?"
+          }
+        ],
+        "updates": [],
+        "plan": {
+          "title": "Autumn editorial photoshoot",
+          "summary": "Planning an autumn editorial photoshoot with two models for a full day. The team is currently checking Friday availability and usage fees before selecting talent.",
+          "decisions": [
+            {
+              "text": "The shoot is an editorial photoshoot for the autumn collection.",
+              "sourceQuote": "We are planning an editorial photoshoot for our autumn collection."
+            },
+            {
+              "text": "Two models are needed for a full day.",
+              "sourceQuote": "We need two models for a full day"
+            }
+          ],
+          "nextSteps": [
+            {
+              "text": "Check models' Friday availability and usage fees before choosing.",
+              "sourceQuote": "We need to check their Friday availability and usage fees before we choose anyone."
+            }
+          ],
+          "openQuestions": [
+            "What is the total budget for talent, studio, and crew?",
+            "Which studio will be booked for the full day?",
+            "What specific usage rights and licensing duration are needed for the models?",
+            "Who will handle hair, makeup, styling, and photography?"
+          ]
+        }
+      }
+    },
+    {
+      "scenario": "73 saved cells",
+      "kind": "fast",
+      "elapsedMs": 3672,
+      "contextBytes": 5961,
+      "repairs": [],
+      "field": {
+        "targetId": "f95d31e9-03bf-427d-b919-bcd7d507f5b5",
+        "title": "Model selection",
+        "summary": "Model booking requires checking Friday availability and usage fees before confirming talent.",
+        "sourceQuote": "Let us focus on booking the models. We need to check their Friday availability and usage fees before we choose anyone.",
+        "neighbors": [
+          {
+            "title": "Agency outreach",
+            "question": "Which agencies or direct contacts are you reaching out to for availability?"
+          },
+          {
+            "title": "Usage terms",
+            "question": "What specific media channels and duration will the model usage fees cover?"
+          },
+          {
+            "title": "Fitting requirements",
+            "question": "Will models need fittings or prep sessions prior to Friday?"
+          }
+        ],
+        "updates": [],
+        "questionUpdates": [
+          {
+            "targetId": "be3b0906-cf97-448e-b486-478807e8c484",
+            "question": "Which specific Friday is the target shoot date for the autumn collection?"
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "Correction",
+      "kind": "fast",
+      "elapsedMs": 3738,
+      "contextBytes": 2464,
+      "repairs": [],
+      "field": {
+        "targetId": "ed17fc6c-01c5-4047-83bb-ab01a32b1e1a",
+        "title": "Autumn Editorial Photoshoot",
+        "summary": "Friday is unconfirmed with no studio or models booked, and budget undecided.",
+        "sourceQuote": "Actually Friday is not confirmed. Nobody has booked the studio or contacted the models yet. We still need to decide on a budget.",
+        "neighbors": [
+          {
+            "title": "Shoot Date Scheduling",
+            "question": "What target dates or deadlines dictate when the shoot must take place?"
+          }
+        ],
+        "updates": [],
+        "questionUpdates": []
+      }
+    },
+    {
+      "scenario": "Background recap after correction",
+      "kind": "recap",
+      "elapsedMs": 3502,
+      "plan": {
+        "title": "Autumn editorial photoshoot",
+        "summary": "Planning an autumn collection editorial photoshoot requiring two models for a full day. Friday is not confirmed, the studio is not booked, models have not been contacted, and the budget remains undecided.",
+        "decisions": [
+          {
+            "text": "The shoot is an editorial photoshoot for the autumn collection.",
+            "sourceQuote": "We are planning an editorial photoshoot for our autumn collection."
+          },
+          {
+            "text": "Two models are needed for a full day.",
+            "sourceQuote": "We need two models for a full day"
+          }
+        ],
+        "nextSteps": [],
+        "openQuestions": [
+          "What is the total budget for the photoshoot?",
+          "Which studio will be booked for the full day?",
+          "When is the target date for the shoot?",
+          "Who will source and contact the two models?",
+          "What crew members need to be hired?"
+        ]
+      }
+    }
+  ],
+  "requests": [
+    {
+      "kind": "else_final",
+      "requestBytes": 13957,
+      "inputChars": 11755,
+      "elapsedMs": 7554,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 3221,
+        "completion_tokens": 581,
+        "total_tokens": 3802,
+        "cost": 0.0045945,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0045945,
+          "upstream_inference_prompt_cost": 0.00241575,
+          "upstream_inference_completions_cost": 0.00217875
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "kind": "else_fast",
+      "requestBytes": 4799,
+      "inputChars": 3176,
+      "elapsedMs": 3049,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 1310,
+        "completion_tokens": 142,
+        "total_tokens": 1452,
+        "cost": 0.001515,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.001515,
+          "upstream_inference_prompt_cost": 0.0009825,
+          "upstream_inference_completions_cost": 0.0005325
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "kind": "else_final",
+      "requestBytes": 44166,
+      "inputChars": 41920,
+      "elapsedMs": 23184,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 11327,
+        "completion_tokens": 550,
+        "total_tokens": 11877,
+        "cost": 0.01055775,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.01055775,
+          "upstream_inference_prompt_cost": 0.00849525,
+          "upstream_inference_completions_cost": 0.0020625
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "kind": "else_fast",
+      "requestBytes": 10661,
+      "inputChars": 9038,
+      "elapsedMs": 3669,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 3506,
+        "completion_tokens": 303,
+        "total_tokens": 3809,
+        "cost": 0.00376575,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00376575,
+          "upstream_inference_prompt_cost": 0.0026295,
+          "upstream_inference_completions_cost": 0.00113625
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "kind": "else_fast",
+      "requestBytes": 6868,
+      "inputChars": 5245,
+      "elapsedMs": 3735,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 2030,
+        "completion_tokens": 174,
+        "total_tokens": 2204,
+        "cost": 0.002175,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.002175,
+          "upstream_inference_prompt_cost": 0.0015225,
+          "upstream_inference_completions_cost": 0.0006525
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "kind": "else_recap",
+      "requestBytes": 4072,
+      "inputChars": 2843,
+      "elapsedMs": 3496,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 983,
+        "completion_tokens": 164,
+        "total_tokens": 1147,
+        "cost": 0.00135225,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00135225,
+          "upstream_inference_prompt_cost": 0.00073725,
+          "upstream_inference_completions_cost": 0.000615
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    }
+  ]
+}

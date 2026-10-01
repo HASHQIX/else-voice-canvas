@@ -58,6 +58,17 @@ export function historyStep(owner:string,project:string,branch:string,expected:n
 export function createBranch(owner:string,project:string,sourceId:string,label:string,snapshot:Snapshot,forkNodeId?:string){const source=getBranch(owner,project,sourceId);if(!source)throw new DomainError('not_found','Source branch not found',404);const count:any=db.prepare('SELECT COUNT(*) n FROM branches WHERE project_id=?').get(project);if(count.n>=Number(process.env.MAX_BRANCHES||8))throw new DomainError('branch_limit','Maximum number of branches reached',429);const id=uuid(),t=now(),s=structuredClone(snapshot);s.branchId=id;s.revision=0;const lane=count.n%2?Math.ceil(count.n/2)*520:-Math.ceil(count.n/2)*520; for(const [key,position] of Object.entries(s.layout)){if(s.nodes[key].kind!=='idea')position.x+=lane;}db.prepare('INSERT INTO branches VALUES(?,?,?,?,?,?,?,?,?)').run(id,project,owner,label,0,JSON.stringify(s),0,t,t);initializeHistory(s);return getBranch(owner,project,id)!;}
 export function setMain(owner:string,project:string,branch:string){if(!getBranch(owner,project,branch))throw new DomainError('not_found','Branch not found',404);db.transaction(()=>{db.prepare('UPDATE branches SET is_main=0 WHERE project_id=?').run(project);db.prepare('UPDATE branches SET is_main=1 WHERE id=?').run(branch);db.prepare('UPDATE projects SET updated_at=? WHERE id=?').run(now(),project);})();}
 export function saveTranscript(owner:string,project:string,branch:string,text:string,id=uuid()){db.prepare('INSERT OR IGNORE INTO transcripts VALUES(?,?,?,?,?,?,?)').run(id,project,branch,owner,text,1,now());return id;}
+/** Enrich the current history entry; a background summary is not a user undo step. */
+export function saveRecap(owner: string, project: string, branch: string, snapshot: Snapshot, expected: number) {
+ return db.transaction(() => {
+  assertRevision(owner, project, branch, expected);
+  snapshot.revision = expected + 1;
+  persist(owner, project, snapshot, 'conversation_recap', {});
+  db.prepare('UPDATE history SET snapshot=? WHERE branch_id=? AND position=(SELECT position FROM cursors WHERE branch_id=?)')
+   .run(JSON.stringify(snapshot), branch, branch);
+  return snapshot;
+ })();
+}
 type SpeechRow = {id:string;text:string;is_final:number;created_at:string;session_id:string;speaker_label:string|null};
 function speechSegment(row: SpeechRow): SpeechSegment {
  return {id:row.id,text:row.text,final:Boolean(row.is_final),createdAt:row.created_at,

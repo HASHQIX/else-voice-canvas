@@ -27,7 +27,7 @@ beforeEach(async()=>{
  llmCalls=0;ttsCalls=0;malformed=false;transform=plan=>plan;
  vi.stubGlobal('fetch',vi.fn(async(url:string,options:any)=>{
   if(url.endsWith('/audio/speech')){ttsCalls++;return new Response(new Uint8Array([0,0,1,0]),{headers:{'content-type':'audio/pcm'}});}
-  llmCalls++;const body=JSON.parse(options.body);expect(url).toBe('https://api.openai-next.com/v1/messages');expect(options.headers['x-api-key']).toBe('fake-test-key');expect(options.headers['anthropic-version']).toBe('2023-06-01');expect(body.model).toBe('claude-opus-5-5');expect(body.response_format).toBeUndefined();expect(body.system).toContain('JSON Schema');
+  llmCalls++;const body=JSON.parse(options.body);expect(url).toBe('https://api.openai-next.com/v1/messages');expect(options.headers['x-api-key']).toBe('fake-test-key');expect(options.headers['anthropic-version']).toBe('2023-06-01');expect(body.model).toBe('claude-opus-5-5');expect(body.response_format).toBeUndefined();expect(body.system).toContain('supplied structured response schema');expect(body.tools[0].input_schema.type).toBe('object');expect(body.system).not.toContain(JSON.stringify(body.tools[0].input_schema));
   const input=JSON.parse(body.messages[0].content).context;
   return new Response(JSON.stringify({stop_reason:'end_turn',content:[{type:'text',text:malformed?'not JSON':JSON.stringify(transform(makePlan(input),input))}]}),{headers:{'content-type':'application/json'}});
  }));

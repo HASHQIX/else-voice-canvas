@@ -144,6 +144,27 @@ export function App() {
         const timer = setInterval(refresh, 15000);
         return () => { active = false; clearInterval(timer); };
     }, [project?.id, disconnect]);
+    useEffect(() => {
+        // A recap may finish after a deliberate microphone pause closed the socket.
+        if (phase !== 'idle' || !project || !snapshot?.field?.planPending) return;
+        let active = true, attempts = 0;
+        let timer: ReturnType<typeof setTimeout>;
+        const refresh = async () => {
+            try {
+                const value = await getProject(project.id);
+                const next = value.branches.find(branch => branch.id === current.current.snapshot?.branchId)?.snapshot;
+                if (!active || current.current.project?.id !== project.id) return;
+                if (next && next.revision > (current.current.snapshot?.revision ?? -1)) {
+                    current.current.snapshot = next;
+                    setSnapshot(next);
+                }
+            } catch { /* The saved field remains visible; live reconnect also reloads it. */ }
+            if (active && ++attempts < 8 && current.current.snapshot?.field?.planPending)
+                timer = setTimeout(refresh, 5000);
+        };
+        timer = setTimeout(refresh, 1500);
+        return () => { active = false; clearTimeout(timer); };
+    }, [project?.id, phase, snapshot?.revision, snapshot?.field?.planPending]);
     const start = useCallback(async () => {
         const state = current.current;
         if (!state.project || !state.snapshot || !state.leaseReady || !state.writable || creatingConversation.current || connecting.current || live.current)
@@ -213,6 +234,15 @@ export function App() {
                             setPreview('');
                             setError('');
                             setPhase(value => value === 'pausing' ? value : 'listening');
+                            break;
+                        case 'fork.plan':
+                            // Memory refreshes do not reset live speech, camera, or microphone state.
+                            if (payload.snapshot?.projectId === current.current.project?.id &&
+                                payload.snapshot.branchId === current.current.snapshot?.branchId &&
+                                payload.snapshot.revision > (current.current.snapshot?.revision ?? -1)) {
+                                current.current.snapshot = payload.snapshot;
+                                setSnapshot(payload.snapshot);
+                            }
                             break;
                         case 'fork.error':
                             setError(payload.message || 'The connection was interrupted. Please resume the microphone.');
@@ -331,7 +361,7 @@ export function App() {
     const status = phase === 'starting' ? 'Connecting microphone' : phase === 'pausing' ? 'Saving your last thought' : active ? 'Microphone on' : 'Microphone off';
     return <div className="app-shell">
     <header className="app-logo"><a href="/" className="brand" aria-label="ELSE home">ELSE</a></header>
-    <main><ConversationField field={snapshot?.field} transcript={transcript} preview={preview} thinking={phase === 'thinking'} paused={initialized && phase === 'idle'} microphone={{ disabled, onStart: () => void start() }}/></main>
+    <main><ConversationField key={snapshot?.branchId || project?.id || 'empty'} field={snapshot?.field} transcript={transcript} preview={preview} thinking={phase === 'thinking'} paused={initialized && phase === 'idle'} microphone={{ disabled, status: initialized ? status : 'Preparing your conversation', onStart: () => void start() }}/></main>
     <ConversationPlan projectId={project?.id} field={snapshot?.field} transcript={speechSegments} newConversation={{
       disabled: creating || !project, busy: creating,
       title: 'Start a new conversation with a clear transcript, field and plan.',

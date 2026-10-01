@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { finalSchema, previewSchema, DomainError } from './validation.js';
 import { reserveBudget } from './budget.js';
 import { fieldModelSchema, asFinalPlan } from './field-schema.js';
+import { fastSchema, initialFastSchema, recapSchema } from './fast-schema.js';
 import { normalizeSpeaker } from '../shared/transcript.js';
 const env=(key:string,fallback='')=>process.env[key]||fallback;
 const llmProvider=()=>env('LLM_PROVIDER','openrouter').toLowerCase();
@@ -18,21 +19,22 @@ const llmModel=()=>llmProvider()==='openai'?env('OPENAI_LLM_MODEL','gpt-4.1-mini
 export const providerStatus=()=>({assemblyai:Boolean(env('ASSEMBLYAI_API_KEY')),llm:Boolean(llmKey()),llmProvider:llmProvider(),llmModel:llmModel(),openai:Boolean(env('OPENAI_API_KEY')),tts:Boolean(env('OPENAI_API_KEY')),budgetConfigured:Number(env('DAILY_LLM_BUDGET_USD',env('DAILY_BUDGET_USD')))>0});
 export function requireProviders(voice=false){const status=providerStatus();if(!status.llm||voice&&!status.assemblyai)throw new DomainError('provider_unavailable','Voice and AI are awaiting server provider configuration',503);if(!status.budgetConfigured)throw new DomainError('budget_unconfigured','AI budget has not been configured',503);}
 const prompt=(name:string)=>fs.readFileSync(`PLAN/prompts/${name}-system.md`,'utf8').replaceAll('FORK','ELSE');
-export async function structuredResponse(kind:'preview'|'final',input:unknown,signal?:AbortSignal,repair?:{proposal:any;errors:string}){
+export async function structuredResponse(kind:'preview'|'final'|'fast'|'recap',input:unknown,signal?:AbortSignal,repair?:{proposal:any;errors:string}){
  requireProviders();reserveBudget(kind==='preview'?0.01:0.06,kind);
  const timeout=AbortSignal.timeout(25000),signals=signal?AbortSignal.any([signal,timeout]):timeout;
  const fieldInput=kind==='final'?(input as any)?.conversationField:undefined;
+ const initialField=kind==='fast'&&(input as any)?.conversationField?.isInitial===true;
  const compactField=llmProvider()==='openrouter'&&llmModel().startsWith('google/');
- const schema=kind==='preview'?previewSchema:fieldInput?fieldModelSchema(fieldInput,{compact:compactField}):finalSchema;
+ const schema=kind==='fast'?(initialField?initialFastSchema:fastSchema):kind==='recap'?recapSchema:kind==='preview'?previewSchema:fieldInput?fieldModelSchema(fieldInput,{compact:compactField}):finalSchema;
  const normalize=(value:any)=>fieldInput?asFinalPlan(value):value;
  const toolName=`else_${kind}`;
  const outputInstruction=llmProvider()==='anthropic'
   ?`Use the required ${toolName} tool exactly once. The tool input is the only response; do not write prose or markdown.`
   :'Return only a JSON object; do not write prose or markdown.';
- const system=`${prompt(kind)+(repair?'\n'+prompt('repair'):'')}\n\n${outputInstruction} It must conform to this JSON Schema (the server validates it):\n${JSON.stringify(schema)}${kind==='final'?`\nFor every selected statement based on the current user turn, include a sourceRefs entry with the currentTurnId and an exact quote from the current user text.`:''}${repair?`\n\nPrevious proposal and validation errors to repair:\n${JSON.stringify(repair)}`:''}`;
- const maxTokens=kind==='preview'?600:fieldInput?4000:4500;
+ const system=`${prompt(kind)+(repair?'\n'+prompt('repair'):'')}\n\n${outputInstruction} Conform to the supplied structured response schema.${kind==='final'?`\nFor selected statements from the current turn, include currentTurnId and an exact quote.`:''}`;
+ const maxTokens=kind==='preview'?600:kind==='fast'?(initialField?1800:1200):kind==='recap'?2400:fieldInput?4000:4500;
  const response=await (async()=>llmProvider()==='anthropic'
-  ?await fetch(`${env('ANTHROPIC_BASE_URL','https://api.openai-next.com').replace(/\/$/,'')}${env('ANTHROPIC_BASE_URL','').replace(/\/$/,'').endsWith('/v1')?'':'/v1'}/messages`,{method:'POST',signal:signals,headers:{'x-api-key':env('VECTRUST_API_KEY'),'anthropic-version':'2023-06-01','Content-Type':'application/json'},body:JSON.stringify({model:env('LLM_MODEL','claude-opus-5-5'),system,max_tokens:kind==='preview'?600:fieldInput?4000:4500,tools:[{name:toolName,description:`Return the ${kind} object matching the supplied schema.`,input_schema:schema}],tool_choice:{type:'tool',name:toolName},messages:[{role:'user',content:JSON.stringify({context:input,...(repair||{})})}]})})
+  ?await fetch(`${env('ANTHROPIC_BASE_URL','https://api.openai-next.com').replace(/\/$/,'')}${env('ANTHROPIC_BASE_URL','').replace(/\/$/,'').endsWith('/v1')?'':'/v1'}/messages`,{method:'POST',signal:signals,headers:{'x-api-key':env('VECTRUST_API_KEY'),'anthropic-version':'2023-06-01','Content-Type':'application/json'},body:JSON.stringify({model:env('LLM_MODEL','claude-opus-5-5'),system,max_tokens:maxTokens,tools:[{name:toolName,description:`Return the ${kind} object matching the supplied schema.`,input_schema:schema}],tool_choice:{type:'tool',name:toolName},messages:[{role:'user',content:JSON.stringify({context:input,...(repair||{})})}]})})
   :llmProvider()==='openrouter'
   ?await fetch(`${env('OPENROUTER_BASE_URL','https://openrouter.ai/api/v1').replace(/\/$/,'')}/chat/completions`,{
    method:'POST',signal:signals,
@@ -44,7 +46,7 @@ export async function structuredResponse(kind:'preview'|'final',input:unknown,si
     provider:{require_parameters:true},reasoning:{effort:'low',exclude:true},
    }),
   })
-  :await fetch(`${env('OPENAI_BASE_URL','https://api.openai.com/v1').replace(/\/$/,'')}/responses`,{method:'POST',signal:signals,headers:{Authorization:`Bearer ${env('OPENAI_API_KEY')}`,'Content-Type':'application/json'},body:JSON.stringify({model:env('OPENAI_LLM_MODEL','gpt-4.1-mini-2025-04-14'),store:false,max_output_tokens:kind==='preview'?600:fieldInput?4000:4500,input:[{role:'system',content:system},{role:'user',content:JSON.stringify({context:input,...(repair||{})})}],text:{format:{type:'json_schema',name:`else_${kind}`,strict:true,schema}}})}))().catch(error=>{if(signal?.aborted)throw error;if(timeout.aborted)throw new DomainError('provider_timeout','Analysis took too long. Your last words are retained; keep talking or retry.',504);throw new DomainError('provider_unavailable','The analysis service could not be reached. Your last words are retained.',502);});
+  :await fetch(`${env('OPENAI_BASE_URL','https://api.openai.com/v1').replace(/\/$/,'')}/responses`,{method:'POST',signal:signals,headers:{Authorization:`Bearer ${env('OPENAI_API_KEY')}`,'Content-Type':'application/json'},body:JSON.stringify({model:env('OPENAI_LLM_MODEL','gpt-4.1-mini-2025-04-14'),store:false,max_output_tokens:maxTokens,input:[{role:'system',content:system},{role:'user',content:JSON.stringify({context:input,...(repair||{})})}],text:{format:{type:'json_schema',name:`else_${kind}`,strict:true,schema}}})}))().catch(error=>{if(signal?.aborted)throw error;if(timeout.aborted)throw new DomainError('provider_timeout','Analysis took too long. Your last words are retained; keep talking or retry.',504);throw new DomainError('provider_unavailable','The analysis service could not be reached. Your last words are retained.',502);});
  if(!response.ok)throw new DomainError('provider_error',`Analysis service returned ${response.status}`,502);
  let data:any;try{data=await response.json();}catch(error){if(signal?.aborted)throw error;if(timeout.aborted)throw new DomainError('provider_timeout','Analysis took too long. Your last words are retained; keep talking or retry.',504);throw new DomainError('provider_error','Analysis returned an unreadable response. Your last words are retained.',502);}
  if(!data||typeof data!=='object'||Array.isArray(data))throw new DomainError('provider_error','Analysis returned an unreadable response. Your last words are retained.',502);

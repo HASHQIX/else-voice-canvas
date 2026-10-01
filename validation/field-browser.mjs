@@ -36,7 +36,7 @@ try {
   navigator.mediaDevices.getUserMedia = async constraints => { window.__permissionRequests++; const stream = await get(constraints); window.__tracks.push(...stream.getTracks()); return stream; };
  });
  const page = await context.newPage();
- page.setDefaultTimeout(15000);
+ page.setDefaultTimeout(35000);
  let sessionsCreated=0,cancelledSessions=0,delaySession=false,releaseSession;
  let projectsCreated=0,failProject=false,delayProject=false,releaseProject;
  const sessionProjects=[];
@@ -125,9 +125,81 @@ try {
  assert.equal(await page.evaluate(()=>window.__permissionRequests),1,'Auto-start requests microphone once, including React StrictMode');
  assert.equal(await page.locator('.empty-grid > *').count(),9);
  assert.equal(await page.locator('textarea').count(),0);
+ assert.equal(await page.locator('.conversation-invitation-caption').textContent(),'Listening. Speak your mind.','An already active microphone does not ask the user to start it');
+ assert.equal(await page.locator('.conversation-face path').count(),7,'The welcome tile uses Arrival’s original speaking-face vector');
+ assert.equal(await page.getByText('Start anywhere.',{exact:true}).count(),0);
  await page.screenshot({path:'validation/field-empty.png'});
+ emit('fork.transcript',{text:'I want to plan an editorial shoot.'});
+ await page.locator('.empty-center p').filter({hasText:'I want to plan an editorial shoot.'}).waitFor();
+ assert.equal(await page.locator('.conversation-invitation').count(),0,'Real incoming speech replaces the invitation before the first field arrives');
+ let fastField = {...structuredClone(field), plan:undefined, planPending:true};
+ await page.evaluate(()=>{
+  window.__cardArrivals=[];
+  window.__arrivalObserver=new MutationObserver(()=>{
+   for(const cell of document.querySelectorAll('.field-cell'))if(!window.__cardArrivals.some(entry=>entry.id===cell.dataset.cellId))
+    window.__cardArrivals.push({id:cell.dataset.cellId,at:performance.now()});
+  });
+  window.__arrivalObserver.observe(document.querySelector('.field-content-viewport'),{childList:true,subtree:true});
+ });
+ emit('fork.committed',{snapshot:{...snapshot,revision:1,field:fastField}});
+ await page.waitForFunction(()=>document.querySelectorAll('.field-cell[data-visible=true]').length===9);
+ const arrivals=await page.evaluate(()=>{window.__arrivalObserver.disconnect();return window.__cardArrivals});
+ assert.equal(arrivals.length,9);
+ assert.ok(Math.max(...arrivals.map(entry=>entry.at))-Math.min(...arrivals.map(entry=>entry.at))<50,'The entire first grid arrives in one render without stagger delays');
+ const entryAnimations=await page.locator('.card-turn').evaluateAll(cells=>cells.map(cell=>{
+  const style=getComputedStyle(cell);return {name:style.animationName,duration:style.animationDuration};
+ }));
+ assert.ok(entryAnimations.every(animation=>animation.name==='card-flip'&&animation.duration==='0.7s'),'Every opening slot uses a two-sided 3D flip');
+ await page.locator('.card-turn').evaluateAll(cells=>cells.forEach(cell=>cell.getAnimations().filter(animation=>animation.animationName==='card-flip').forEach(animation=>{animation.pause();animation.currentTime=500})));
+ await page.screenshot({path:'validation/field-opening-enter.png'});
+ await page.locator('.card-turn').evaluateAll(cells=>cells.forEach(cell=>cell.getAnimations().filter(animation=>animation.animationName==='card-flip').forEach(animation=>animation.play())));
+ await page.waitForFunction(()=>document.querySelectorAll('.field-cell[data-flipping=true]').length===0);
+ assert.equal(await page.locator('.plan-clarify li').count(),8,'Eight opening questions appear without waiting for a cumulative plan');
+ await page.screenshot({path:'validation/field-opening.png'});
+ await page.screenshot({path:'validation/field-fast.png'});
+ const pacedField=structuredClone(fastField);
+ const pacedQuestions=Object.values(pacedField.cells).filter(cell=>!cell.visited).slice(0,2);
+ pacedQuestions.forEach((cell,index)=>{cell.question=`Follow-up ${index+1}: ${cell.question}`});
+ await page.evaluate(questions=>{
+  window.__pacedArrivals=[];
+  window.__pacedObserver=new MutationObserver(()=>{
+   for(const question of questions)if(document.querySelector(`[data-cell-id="${question.id}"] .cell-copy p`)?.textContent===question.question&&!window.__pacedArrivals.some(entry=>entry.id===question.id))
+    window.__pacedArrivals.push({id:question.id,at:performance.now()});
+  });
+  window.__pacedObserver.observe(document.querySelector('.field-content-viewport'),{childList:true,characterData:true,subtree:true});
+ },pacedQuestions);
+ emit('fork.committed',{snapshot:{...snapshot,revision:2,field:pacedField}});
+ await page.waitForFunction(()=>window.__pacedArrivals.length===2);
+ const subsequentArrivals=await page.evaluate(()=>{window.__pacedObserver.disconnect();return window.__pacedArrivals});
+ assert.ok(subsequentArrivals[1].at-subsequentArrivals[0].at>=2400,'Subsequent questions retain the 2.5-second cadence');
+ assert.ok(await page.locator('.field-cell[data-flipping=true]').count()<=1,'Only the updated slot is flipping');
+ fastField=pacedField;
+ const firstQuestion=Object.values(fastField.cells).find(cell=>!cell.visited);
+ const firstCard=page.locator(`[data-cell-id="${firstQuestion.id}"]`);
+ await firstCard.evaluate(cell=>{window.__stableQuestionSlot=cell});
+ const revisionOne=structuredClone(fastField);revisionOne.cells[firstQuestion.id].question='Are both models available Friday?';
+ emit('fork.committed',{snapshot:{...snapshot,revision:2,field:revisionOne}});
+ await firstCard.locator('p').filter({hasText:'Are both models available Friday?'}).waitFor();
+ await firstCard.locator('.card-turn[data-turning=false]').waitFor();
+ const readSince=Number(await firstCard.getAttribute('data-readable-since'));
+ const revisionTwo=structuredClone(revisionOne);revisionTwo.cells[firstQuestion.id].question='Are both models available Saturday?';
+ emit('fork.committed',{snapshot:{...snapshot,revision:3,field:revisionTwo}});
+ emit('fork.transcript',{text:'We are still discussing the dates.'});
+ await page.waitForTimeout(100);
+ assert.equal(await firstCard.locator('p').textContent(),'Are both models available Friday?','A new suggestion gets a reading window during a burst');
+ const revisionThree=structuredClone(revisionTwo);revisionThree.cells[firstQuestion.id].question='Are both models available Sunday?';
+ emit('fork.committed',{snapshot:{...snapshot,revision:4,field:revisionThree}});
+ await firstCard.locator('p').filter({hasText:'Are both models available Sunday?'}).waitFor();
+ assert.ok(await page.evaluate(since=>performance.now()-since>=10000,readSince),'The previous completed face was held for at least ten seconds');
+ assert.ok(await firstCard.evaluate(cell=>cell===window.__stableQuestionSlot),'Refining a question retains its physical slot');
+ await firstCard.locator('.card-turn[data-turning=false]').waitFor();
+ assert.ok(await firstCard.locator('h2,p').evaluateAll(elements=>elements.every(element=>getComputedStyle(element).opacity==='1'&&getComputedStyle(element).filter==='none'&&!element.getAnimations().length)),'After a flip the text is readable with no continuing animation');
  snapshot={...snapshot,revision:1,field}; emit('fork.committed',{snapshot});
  await page.locator('.field-cell[data-visible=true]').first().waitFor();
+ await page.waitForFunction(()=>document.querySelectorAll('.field-cell[data-visible=true]').length===9,null,{timeout:25000}).catch(async error=>{
+  console.error('Field diagnostic',await page.locator('.field-cell').evaluateAll(cells=>cells.map(cell=>({title:cell.querySelector('h2')?.textContent,visible:cell.dataset.visible,x:cell.dataset.worldX,y:cell.dataset.worldY}))),errors);
+  throw error;
+ });
  await page.waitForTimeout(2350);
  const geometry=await page.locator('.field-cell[data-visible=true]').evaluateAll(cells=>cells.map(cell=>{const r=cell.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,id:cell.dataset.cellId,worldX:cell.dataset.worldX,worldY:cell.dataset.worldY}}));
  assert.equal(geometry.length,9);
@@ -222,7 +294,8 @@ try {
  await page.evaluate(()=>{
   window.__focusHeading=document.querySelector('.field-cell.current h2');
   window.__focusEntrance=window.__focusHeading.getAnimations()[0];
-  window.__focusFill=document.querySelector('.focus-fill').getAnimations()[0];
+  window.__focusSlot=document.querySelector('.field-cell.current');
+  window.__focusTurn=document.querySelector('.field-cell.current .card-turn');
  });
  const firstSpeech='We need two models for Friday. '+ 'The studio is booked, and we still need to agree on the full-day rates and availability. '.repeat(4);
  const segment={id:'speech-session:1',text:'We need two models',final:false,createdAt:'2026-09-30T10:00:00.000Z',speaker:'UNKNOWN',sessionId:'speech-session'};
@@ -238,7 +311,7 @@ try {
  assert.equal(await page.locator('[data-segment-id="speech-session:1"]').count(),1,'Interim corrections replace the paragraph');
  assert.ok(await page.evaluate(()=>window.__speechEntrance&&document.querySelector('[data-segment-id="speech-session:1"]').getAnimations()[0]===window.__speechEntrance),'ASR corrections do not restart the phrase entrance');
  assert.ok(await page.evaluate(()=>document.querySelector('.field-cell.current h2')===window.__focusHeading&&window.__focusHeading.getAnimations()[0]===window.__focusEntrance),'Speech does not make existing card text blink or reanimate');
- assert.ok(await page.evaluate(()=>document.querySelector('.focus-fill').getAnimations()[0]===window.__focusFill),'Speech does not restart the focus fill');
+ assert.ok(await page.evaluate(()=>document.querySelector('.field-cell.current .card-turn')===window.__focusTurn),'Speech alone does not flip the current card');
  assert.equal(await page.locator('[data-segment-id="speech-session:1"]').evaluate(element=>getComputedStyle(element).webkitLineClamp),'none','Speech is not line-clamped');
  const secondSpeech={id:'speech-session:2',text:'Friday is confirmed.',final:true,createdAt:'2026-09-30T10:00:01.000Z',speaker:'B',sessionId:'speech-session'};
  emit('fork.speech_segment',{segment:secondSpeech});
@@ -246,6 +319,18 @@ try {
  assert.deepEqual(await page.locator('.transcript-scroll .transcript-words').allTextContents(),[secondSpeech.text,firstSpeech],'New speech appears above the earlier history');
  assert.deepEqual(await page.locator('.transcript-scroll .transcript-speaker').allTextContents(),['Person 2','Person 1'],'Each participant is labeled consistently in newest-first speech');
  assert.equal(await page.locator('.transcript-scroll').evaluate(element=>element.scrollTop),0,'The transcript follows new speech at the top');
+ const speechBeforeRecap=await page.locator('.transcript-scroll .transcript-words').allTextContents();
+ const boardBeforeRecap=await page.locator('.field-board').boundingBox();
+ snapshot={...snapshot,revision:snapshot.revision+1,field:{...field,planPending:false,plan:{...field.plan,summary:'A refreshed background summary.'}}};
+ emit('fork.plan',{snapshot});
+ await page.waitForFunction(()=>document.querySelector('.plan-overview p')?.textContent==='A refreshed background summary.');
+ assert.deepEqual(await page.locator('.transcript-scroll .transcript-words').allTextContents(),speechBeforeRecap,'A background plan preserves all ongoing speech');
+ assert.deepEqual(await page.locator('.field-board').boundingBox(),boardBeforeRecap,'A recap does not move the fixed grid');
+ assert.ok(await page.getByRole('button',{name:'Pause microphone',exact:true}).isVisible(),'A recap keeps the microphone active');
+ emit('fork.plan',{snapshot:{...snapshot,projectId:'obsolete-project',revision:999,field:{...field,plan:{...field.plan,summary:'WRONG PROJECT'}}}});
+ emit('fork.plan',{snapshot:{...snapshot,revision:0,field:{...field,plan:{...field.plan,summary:'STALE REVISION'}}}});
+ await page.waitForTimeout(50);
+ assert.equal(await page.locator('.plan-overview p').textContent(),'A refreshed background summary.','Late foreign or stale recaps cannot replace the active conversation');
  assert.equal(await sidebar.locator('.plan-topics article').count(),1,'Unvisited suggestions are not counted as discussed topics');
  const transcriptType=await page.locator('.transcript-scroll p').first().evaluate(element=>{const style=getComputedStyle(element);return {line:parseFloat(style.lineHeight),size:parseFloat(style.fontSize)}});
  assert.ok(transcriptType.line/transcriptType.size<1.45,'Nested transcript keeps compact line spacing');
@@ -289,17 +374,14 @@ try {
  longField.plan.openQuestions=Array.from({length:12},(_,i)=>`Question ${i+1}: Which practical details still need to be discussed together before confirming dates, bookings, availability and the final plan?`);
  emit('fork.committed',{snapshot:{...snapshot,field:longField}});
  await page.waitForTimeout(100);
- assert.ok(await page.evaluate(()=>document.querySelector('.focus-fill').getAnimations()[0]===window.__focusFill),'Editing the same topic preserves its completed dark fill');
- const entrance=await page.locator('.field-cell.current').evaluate(cell=>{
-  const title=cell.querySelector('h2'),caption=cell.querySelector('p');
-  const animations=[title.getAnimations()[0],caption.getAnimations()[0]];
-  for(const animation of animations){animation.pause();animation.currentTime=300;}
-  const a=getComputedStyle(title),b=getComputedStyle(caption);
-  const result={replayed:title!==window.__focusHeading,titleOpacity:Number(a.opacity),captionOpacity:Number(b.opacity),y:new DOMMatrix(a.transform).m42,blur:parseFloat(a.filter.slice(5))};
-  for(const animation of animations)animation.play();
-  return result;
- });
- assert.ok(entrance.replayed&&entrance.titleOpacity>entrance.captionOpacity&&entrance.y<0&&entrance.blur>0,'Updated titles appear from above with blur before their captions');
+ await page.waitForFunction(()=>document.querySelector('.field-cell.current').dataset.flipping==='false');
+ const stableCopy=await page.locator('.field-cell.current').evaluate(cell=>({
+  sameSlot:cell===window.__focusSlot,
+  titleOpacity:getComputedStyle(cell.querySelector('h2')).opacity,
+  captionOpacity:getComputedStyle(cell.querySelector('p')).opacity,
+  animations:cell.querySelector('h2').getAnimations().length+cell.querySelector('p').getAnimations().length,
+ }));
+ assert.deepEqual(stableCopy,{sameSlot:true,titleOpacity:'1',captionOpacity:'1',animations:0},'The topic completes its flip in the same center slot');
  assert.equal(await page.locator('[data-segment-id="speech-session:1"] .transcript-words').textContent(),firstSpeech,'All recognized words stay visible after an update is saved');
  assert.ok(await page.locator('.field-cell.current .cell-copy').evaluate(element=>element.scrollHeight<=element.clientHeight+1),'The desktop center fits a two-line title and conversation summary');
  assert.equal(await page.locator('.field-cell.current p').textContent(),'Planning a two-week trip to Japan next spring.','Older multi-sentence summaries show a single sentence on the canvas');
@@ -317,59 +399,32 @@ try {
  await content.evaluate(element=>{element.scrollTop=0});
 
 
- await page.evaluate(targetId=>{
-  window.__cameraFrames=[];
-  const began=performance.now();
-  const target=document.querySelector(`[data-cell-id="${targetId}"]`);
-  const sample=()=>{
-   const grid=document.querySelector('.field-world-grid').getBoundingClientRect();
-   const cell=target.getBoundingClientRect();
-   const phaseX=(cell.x-grid.x)/cell.width,phaseY=(cell.y-grid.y)/cell.height;
-   window.__cameraFrames.push({x:cell.x,y:cell.y,error:Math.max(Math.abs(phaseX-Math.round(phaseX)),Math.abs(phaseY-Math.round(phaseY)))});
-   if(performance.now()-began<800)requestAnimationFrame(sample);
-  };requestAnimationFrame(sample);
- },moved.focusId);
+ const fixedBefore=await page.locator('.field-cell').evaluateAll(cells=>cells.map(cell=>{const r=cell.getBoundingClientRect();return [r.x,r.y,r.width,r.height]}));
  snapshot={...snapshot,revision:2,field:moved}; emit('fork.committed',{snapshot});
- await page.waitForTimeout(180);
- const movingCopy=await page.locator('.field-cell.current').evaluate(cell=>({ready:cell.parentElement.dataset.textReady,opacity:getComputedStyle(cell.querySelector('h2')).opacity}));
- assert.deepEqual(movingCopy,{ready:'false',opacity:'0'},'New text stays hidden while the camera moves');
- assert.equal(await page.locator('.focus-fill').evaluate(element=>getComputedStyle(element).clipPath),'inset(0px 0px 100%)','The incoming card stays light during the pan');
- await page.screenshot({path:'validation/field-moving.png'});
- await page.waitForFunction(()=>document.querySelector('.field-content-viewport .field-camera')?.dataset.textReady==='true');
- const arrivedCopy=await page.locator('.field-cell.current').evaluate(cell=>({title:getComputedStyle(cell.querySelector('h2')).opacity,caption:getComputedStyle(cell.querySelector('p')).opacity}));
- assert.deepEqual(arrivedCopy,{title:'0',caption:'0'},'There is a short pause after the camera arrives before text enters');
- await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.field-cell.current h2')).opacity)>0);
- assert.equal(await page.locator('.field-cell.current p').evaluate(element=>getComputedStyle(element).opacity),'0','The heading enters before the description');
- await page.waitForFunction(()=>getComputedStyle(document.querySelector('.field-cell.current p')).opacity==='1');
- assert.equal(await page.locator('.focus-fill').evaluate(element=>getComputedStyle(element).clipPath),'inset(0px 0px 100%)','The fill waits until both title and caption have appeared');
- await page.locator('.focus-fill').evaluate(element=>{const animation=element.getAnimations()[0];animation.pause();animation.currentTime=1780;});
- const wipe=await page.locator('.field-cell.current').evaluate(cell=>{
-  const layer=cell.querySelector('.focus-fill');
-  const style=getComputedStyle(layer);
-  const bounds=element=>{const r=element.getBoundingClientRect();return [r.x,r.y,r.width,r.height]};
-  return {clip:style.clipPath,background:style.backgroundColor,color:style.color,hidden:layer.getAttribute('aria-hidden'),base:bounds(cell.querySelector('h2')),overlay:bounds(cell.querySelector('.focus-title')),baseCaption:bounds(cell.querySelector('p')),overlayCaption:bounds(cell.querySelector('.focus-caption'))};
- });
- const remaining=Number(wipe.clip.match(/([\d.]+)%/)?.[1]);
- assert.ok(remaining>0&&remaining<100,'The fill has a visible intermediate edge moving from top to bottom');
- assert.deepEqual(wipe.base,wipe.overlay,'The light heading exactly overlays the dark heading');
- assert.deepEqual(wipe.baseCaption,wipe.overlayCaption,'The light caption exactly overlays the dark caption');
- assert.equal(wipe.background,'rgb(48, 48, 48)');
- assert.equal(wipe.color,'rgb(247, 246, 242)');
- assert.equal(wipe.hidden,'true','The visual inverted copy is hidden from assistive technology');
- await page.screenshot({path:'validation/field-filling.png'});
- await page.locator('.focus-fill').evaluate(async element=>{const animation=element.getAnimations()[0];animation.play();await animation.finished;});
- assert.match(await page.locator('.focus-fill').evaluate(element=>getComputedStyle(element).clipPath),/^inset\(0(?:px|%)(?: 0(?:px|%))*\)$/,'The focus settles to a fully dark card');
- const frames=await page.evaluate(()=>window.__cameraFrames);
- assert.ok(frames.length>5&&frames.every(frame=>frame.error<0.002),'Grid lines stay attached to cells throughout the pan');
- assert.ok(Math.abs(frames.at(-1).x-frames[0].x)>20,'The camera moves through intermediate positions');
+ await page.locator('.field-cell.current h2').filter({hasText:'Model booking'}).waitFor();
+ assert.equal(await page.locator('.field-camera').count(),0,'Focus changes have no camera layer');
+ assert.deepEqual(await page.locator('.field-cell').evaluateAll(cells=>cells.map(cell=>{const r=cell.getBoundingClientRect();return [r.x,r.y,r.width,r.height]})),fixedBefore,'Every slot stays in place through a focus change');
+ assert.equal(await page.locator('.field-cell h2').count(),9,'Old questions keep every slot filled');
+ const centerTurn=page.locator('.field-cell.current .card-turn');
+ assert.equal(await centerTurn.locator('.card-front[aria-hidden=true]').count(),1,'The old face remains during the first half');
+ assert.equal(await centerTurn.locator('.card-back h2').textContent(),'Model booking','The new topic is on the reverse face');
+ await centerTurn.evaluate(element=>{const animation=element.getAnimations()[0];animation.pause();animation.currentTime=500});
+ assert.equal(await centerTurn.locator('.card-back').evaluate(element=>getComputedStyle(element).backfaceVisibility),'hidden','Backfaces do not show mirrored text');
+ assert.match(await centerTurn.evaluate(element=>getComputedStyle(element).transform),/^matrix3d/);
+ await page.screenshot({path:'validation/field-flip-mid.png'});
+ await centerTurn.evaluate(element=>element.getAnimations().forEach(animation=>animation.play()));
+ await page.waitForFunction(()=>document.querySelector('.field-cell.current').dataset.flipping==='false');
  const current=await page.locator('.field-cell.current').boundingBox(), viewport=await page.locator('.field-viewport').boundingBox();
  assert.ok(Math.abs(current.x+current.width/2-(viewport.x+viewport.width/2))<1);
  assert.ok(Math.abs(current.y+current.height/2-(viewport.y+viewport.height/2))<1);
- assert.equal(await page.locator('.field-cell[data-visible=true]').count(),9);
- assert.equal(await page.locator('.field-cell').count(),14);
+ assert.equal(await page.locator('.field-cell').count(),9);
+ assert.equal(await page.locator('.field-cell h2').count(),9);
  await assertCoreVisible();
- for(const before of geometry){const cell=page.locator(`[data-cell-id="${before.id}"]`);assert.equal(await cell.getAttribute('data-world-x'),before.worldX);assert.equal(await cell.getAttribute('data-world-y'),before.worldY)}
- await page.screenshot({path:'validation/field-moved.png'});
+ const displayed=await page.locator('.field-cell').evaluateAll(cells=>cells.map(cell=>({id:cell.dataset.cellId,x:Number(cell.dataset.worldX),y:Number(cell.dataset.worldY)})));
+ for(const cell of displayed) assert.deepEqual([cell.x,cell.y],[moved.cells[cell.id].x,moved.cells[cell.id].y]);
+ assert.equal(Object.keys(moved.cells).length,14,'Saved history is retained outside the nine screen slots');
+ await page.screenshot({path:'validation/field-fixed-topics.png'});
+
  assert.ok(await sidebar.getByText(moved.plan.nextSteps[0].text,{exact:true}).isVisible(),'The running plan updates from committed conversation data');
  assert.deepEqual(await now.locator(':scope>.plan-section').evaluateAll(sections=>sections.map(section=>section.getAttribute('aria-label'))),['To clarify','Next steps','Settled'],'Open questions and actions lead; confirmed points follow');
  assert.ok(!(await history.evaluate(element=>element.open)),'Focus changes do not reopen History');
@@ -425,17 +480,20 @@ try {
  assert.equal(await sidebar.locator('.plan-next').count(),0,'Completed actions do not remain in Next steps');
  assert.ok(await sidebar.locator('.plan-settled').getByText('Both models confirmed for Friday.',{exact:true}).isVisible(),'The resulting confirmed point is shown as settled');
  emit('fork.committed',{snapshot:{...snapshot,field}});
- await page.waitForFunction(()=>document.querySelector('.field-cell.current h2')?.textContent==='Photoshoot planning'&&document.querySelector('.field-content-viewport .field-camera')?.dataset.textReady==='false');
+ await page.locator('.field-cell.current h2').filter({hasText:'Photoshoot planning'}).waitFor();
  await page.waitForTimeout(150);
  emit('fork.committed',{snapshot});
- await page.waitForFunction(()=>document.querySelector('.field-cell.current h2')?.textContent==='Model booking'&&document.querySelector('.field-content-viewport .field-camera')?.dataset.textReady==='false');
- assert.equal(await page.locator('.field-content-viewport .field-camera').getAttribute('data-text-ready'),'false','Returning to the previous focus during a pan still waits for the camera');
- assert.equal(await page.locator('.field-cell.current h2').evaluate(element=>getComputedStyle(element).opacity),'0');
- assert.equal(await page.locator('.focus-fill').evaluate(element=>getComputedStyle(element).clipPath),'inset(0px 0px 100%)','An interrupted return pan starts with a light card');
- await page.waitForFunction(()=>document.querySelector('.field-content-viewport .field-camera')?.dataset.textReady==='true');
- await page.waitForTimeout(2350);
+ await page.locator('.field-cell.current h2').filter({hasText:'Model booking'}).waitFor();
+ await page.waitForFunction(()=>document.querySelector('.field-cell.current').dataset.flipping==='false');
+ assert.equal(await page.locator('.field-cell h2').count(),9,'Rapid focus changes retain all occupied slots');
+ assert.deepEqual(await page.locator('.field-cell').evaluateAll(cells=>cells.map(cell=>{const r=cell.getBoundingClientRect();return [r.x,r.y,r.width,r.height]})),fixedBefore,'Rapid topic changes never shift the grid');
+ snapshot={...snapshot,revision:snapshot.revision+1,field:{...snapshot.field,planPending:true}};
+ emit('fork.committed',{snapshot});
  await page.getByRole('button',{name:'Pause microphone',exact:true}).click();
  await page.getByRole('button',{name:'Resume microphone',exact:true}).waitFor();
+ snapshot={...snapshot,revision:snapshot.revision+1,field:{...snapshot.field,planPending:false}};
+ await page.waitForFunction(()=>!document.querySelector('.plan-refresh-status'),null,{timeout:8000});
+ assert.ok(await page.getByRole('button',{name:'Resume microphone',exact:true}).isVisible(),'A plan completing after socket closure is polled without restarting capture');
  assert.equal(await micControl.locator('svg').evaluate(svg=>getComputedStyle(svg).fill),'none','Pausing returns the triangle to its outline');
  assert.equal(await micLevel.evaluate(element=>getComputedStyle(element).opacity),'0.35','The inactive indicator is dimmed');
  assert.ok(await page.evaluate(()=>window.__tracks.every(track=>track.readyState==='ended')),'Pause releases all microphone tracks');
@@ -493,9 +551,12 @@ try {
  await page.emulateMedia({reducedMotion:'reduce'});
  emit('fork.committed',{snapshot:{...snapshot,field}});
  await page.waitForFunction(()=>document.querySelector('.field-cell.current h2')?.textContent==='Photoshoot planning');
- assert.equal(await page.locator('.field-content-viewport .field-camera').getAttribute('data-text-ready'),'true','Reduced motion never leaves the text waiting for a missing camera transition');
+ assert.equal(await page.locator('.field-cell').count(),9,'Reduced motion presents the whole latest field immediately');
+ assert.equal(await page.locator('.field-camera').count(),0,'There is no translating camera');
+ assert.equal(await page.locator('.field-cell[data-flipping=true]').count(),0,'Reduced motion disables flips');
  assert.ok(await page.locator('.field-cell[data-visible=true] h2,.field-cell[data-visible=true] p,.transcript-scroll p').evaluateAll(elements=>elements.every(element=>getComputedStyle(element).animationName==='none'&&getComputedStyle(element).opacity==='1')),'Reduced-motion mode keeps every word visible without entrance animations');
- assert.equal(await page.locator('.focus-fill').evaluate(element=>getComputedStyle(element).clipPath),'inset(0px)','Reduced motion shows the dark focus immediately');
+ assert.ok(await page.locator('.cell-update').evaluateAll(elements=>elements.every(element=>getComputedStyle(element).opacity==='0')),'Disabled animations do not leave permanent update highlights');
+ assert.equal(await page.locator('.field-cell.current').evaluate(element=>getComputedStyle(element).backgroundColor),'rgb(48, 48, 48)','Reduced motion keeps the dark center visible');
  failProject=true;
  await newConversationControl.click();
  await page.getByRole('alert').filter({hasText:'Could not start a new conversation.'}).waitFor();
@@ -505,6 +566,19 @@ try {
  failProject=false;
  await page.getByRole('button',{name:'Resume microphone',exact:true}).click();
  await page.getByRole('button',{name:'Pause microphone',exact:true}).waitFor();
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ // Let the media-query change reach React before sending paced field updates.
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const beforeReset=structuredClone(field), resetQuestion=Object.values(beforeReset.cells).find(cell=>!cell.visited);
+ resetQuestion.question='A question that is still being read.';
+ emit('fork.committed',{snapshot:{...snapshot,field:beforeReset}});
+ const resetCard=page.locator(`[data-cell-id="${resetQuestion.id}"] p`);
+ await resetCard.filter({hasText:resetQuestion.question}).waitFor();
+ const queuedBeforeReset=structuredClone(beforeReset);
+ queuedBeforeReset.cells[resetQuestion.id].question='This queued question belongs only to the old conversation.';
+ emit('fork.committed',{snapshot:{...snapshot,field:queuedBeforeReset}});
+ await page.waitForTimeout(50);
+ assert.equal(await resetCard.textContent(),resetQuestion.question,'A replacement is pending when reset starts');
  delayProject=true;
  await newConversationControl.click();
  for(let i=0;i<100&&!releaseProject;i++)await page.waitForTimeout(20);
@@ -515,6 +589,8 @@ try {
  await page.waitForFunction(()=>localStorage.getItem('else.project')==='fresh-project');
  await page.getByRole('button',{name:'Pause microphone',exact:true}).waitFor();
  assert.equal(await page.locator('.field-cell').count(),0,'New conversation clears all old cards');
+ await page.waitForTimeout(3200);
+ assert.equal(await page.locator('.field-cell').count(),0,'An old queued card cannot reappear after a conversation reset');
  assert.equal(await page.locator('.empty-grid > *').count(),9);
  assert.equal(await page.locator('.transcript-scroll [data-segment-id]').count(),0,'New conversation clears the full transcript');
  assert.equal(await sidebar.locator('.plan-topics article').count(),0,'New conversation clears the recap and discussed topics');
@@ -527,18 +603,58 @@ try {
  await page.getByRole('button',{name:'Pause microphone',exact:true}).click();
  await page.getByRole('button',{name:'Resume microphone',exact:true}).waitFor();
  await page.setViewportSize({width:1440,height:1000});
- const emptyMicrophone=page.getByRole('button',{name:'Microphone On',exact:true});
+ const emptyMicrophone=page.getByRole('button',{name:'Tap to begin a conversation',exact:true});
  assert.ok(await emptyMicrophone.isEnabled(),'An empty paused conversation offers a microphone button');
  const requestsBefore=await page.evaluate(()=>window.__permissionRequests);
+ const invitationStyle=await emptyMicrophone.evaluate(button=>{
+  const caption=button.querySelector('.conversation-invitation-caption');
+  const svg=button.querySelector('svg');
+  return {duration:getComputedStyle(caption).animationDuration,animation:getComputedStyle(caption).animationName,
+   fill:getComputedStyle(svg).fill,stroke:getComputedStyle(svg).stroke,width:svg.getBoundingClientRect().width};
+ });
+ assert.equal(invitationStyle.duration,'3s','The onboarding caption breathes over three seconds');
+ assert.equal(invitationStyle.animation,'invitation-pulse');
+ assert.equal(invitationStyle.stroke,'none','Global microphone button styles do not alter the source vector');
+ assert.equal(invitationStyle.fill,'rgb(247, 246, 242)');
+ assert.ok(Math.abs(invitationStyle.width-58*.65)<.1,'The speaking face is 35% smaller on desktop');
  await page.screenshot({path:'validation/field-empty-paused.png'});
- await emptyMicrophone.click();
+ await page.screenshot({path:'validation/field-invitation-desktop.png'});
+ await page.emulateMedia({reducedMotion:'reduce'});
+ assert.equal(await page.locator('.conversation-invitation-caption').evaluate(element=>getComputedStyle(element).animationName),'none','Reduced motion leaves the invitation steady');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.setViewportSize({width:390,height:844});
+ await page.waitForFunction(()=>Math.abs(document.querySelector('.empty-center').getBoundingClientRect().width*3-document.querySelector('.field-content-viewport').getBoundingClientRect().width)<1);
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const invitationFits=await emptyMicrophone.evaluate(button=>{
+  const tile=button.closest('.empty-center');
+  const bounds=tile.getBoundingClientRect();
+  return tile.scrollHeight<=tile.clientHeight&&[button,...button.children].every(element=>{
+   const rect=element.getBoundingClientRect();
+   return rect.left>=bounds.left&&rect.right<=bounds.right&&rect.top>=bounds.top&&rect.bottom<=bounds.bottom;
+  });
+ });
+ assert.ok(invitationFits,'The full caption and speaking face fit inside the mobile center tile');
+ assert.ok(Math.abs(await page.locator('.conversation-face').evaluate(svg=>svg.getBoundingClientRect().width)-44*.65)<.1,'The speaking face is also 35% smaller on mobile');
+ await page.screenshot({path:'validation/field-invitation-mobile.png'});
+ await page.setViewportSize({width:1440,height:1000});
+ delaySession=true;
+ releaseSession=undefined;
+ await emptyMicrophone.focus();
+ await emptyMicrophone.press('Enter');
+ await page.getByRole('button',{name:'Cancel microphone connection',exact:true}).waitFor();
+ assert.equal(await page.locator('.conversation-invitation-caption').textContent(),'Connecting microphone','The start invitation changes while microphone startup is pending');
+ for(let i=0;i<100&&!releaseSession;i++)await page.waitForTimeout(20);
+ assert.ok(releaseSession,'Keyboard activation enters the existing session creation flow');
+ delaySession=false;
+ releaseSession();
  await page.getByRole('button',{name:'Pause microphone',exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>window.__permissionRequests),requestsBefore+1,'The empty-state button requests microphone access through the existing capture flow');
  assert.equal(await emptyMicrophone.count(),0,'The empty-state button disappears when listening starts');
+ assert.equal(await page.locator('.conversation-invitation-caption').textContent(),'Listening. Speak your mind.');
  await page.getByRole('button',{name:'Pause microphone',exact:true}).click();
  await emptyMicrophone.waitFor();
  assert.deepEqual(errors,[]);
- console.log('PASS: auto microphone, nine equal cells, stable world coordinates, aligned camera pan, borderless grid with fading line ends, camera recenter, five new neighbors, pause cleanup, automatic renewal, cancelled startup cleanup, persisted focus, fixed wider sidebar, full saved speech, animated text and bottom microphone toggle, equal insets on desktop and mobile; no page errors');
+ console.log('PASS: fixed nine-slot grid, 3D flips, ten-second reading windows, paced replacements, microphone and history, pause/reset/renewal cleanup, reports and desktop/mobile geometry; no page errors');
  await context.close();
  const denied=await browser.newContext();
  await denied.addInitScript(()=>{window.__deniedRequests=0;navigator.mediaDevices.getUserMedia=async()=>{window.__deniedRequests++;throw new DOMException('Denied','NotAllowedError')}});
@@ -547,12 +663,19 @@ try {
  await deniedPage.goto('http://127.0.0.1:5173');
  await deniedPage.getByRole('alert').filter({hasText:'Allow microphone access'}).waitFor();
  assert.ok(await deniedPage.getByRole('button',{name:'Resume microphone'}).isEnabled());
- const deniedMicrophone=deniedPage.getByRole('button',{name:'Microphone On',exact:true});
+ const deniedMicrophone=deniedPage.getByRole('button',{name:'Tap to begin a conversation',exact:true});
  assert.ok(await deniedMicrophone.isEnabled(),'Permission denial exposes the empty-state retry button');
  await deniedMicrophone.click();
  await deniedPage.waitForFunction(()=>window.__deniedRequests===2);
  await deniedPage.getByRole('alert').filter({hasText:'Allow microphone access'}).waitFor();
  assert.ok(await deniedMicrophone.isEnabled(),'A denied retry stays recoverable');
- console.log('PASS: empty-state microphone start and permission denial retry; camera, text, then downward focus fill with matching inverted text');
+ console.log('PASS: empty-state microphone start and permission denial retry; fixed slots and two-sided flips with readable settled text');
  await denied.close();
+ fs.writeFileSync('validation/field-invitation-result.json',JSON.stringify({testedAt:new Date().toISOString(),mode:'Chromium with synthetic microphone and mocked provider events; no paid provider calls',
+  caption:'Tap to begin a conversation',pulseSeconds:3,iconSource:'Arrival welcome screen',iconScale:.65,
+  checks:['idle invitation','active and connecting copy','real interim text replaces invitation','keyboard start','permission retry by click','reduced motion','desktop/mobile fit','existing voice and field regression suite'],pageErrors:errors},null,2)+'\n');
+ fs.writeFileSync('validation/field-presentation-result.json',JSON.stringify({testedAt:new Date().toISOString(),mode:'Chromium with synthetic WebSocket speech and field snapshots; no paid provider calls',
+  firstBatchArrivalsMs:arrivals.map(entry=>Math.round(entry.at-arrivals[0].at)),
+  subsequentQuestionGapMs:Math.round(subsequentArrivals[1].at-subsequentArrivals[0].at),
+  checks:['complete opening grid','700ms two-sided flips','stationary nine-slot layout','no gaps on sparse focus neighborhoods','ten-second hold after completion','2.5-second spacing between eligible slots','newest pending text','interrupted focus changes','reduced motion','queue cleared on reset','desktop/mobile geometry','35% smaller face','voice/transcript/recap/report lifecycle'],pageErrors:errors},null,2)+'\n');
 } finally { await browser.close(); }

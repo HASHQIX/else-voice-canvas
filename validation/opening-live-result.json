@@ -1,0 +1,87 @@
+{
+  "testedAt": "2026-10-01T09:00:26.676Z",
+  "provider": "openrouter",
+  "model": "google/gemini-3.8-flash",
+  "mode": "Real configured LLM; synthetic text only; no microphone/STT or UI timing included; no user project edited",
+  "results": [
+    {
+      "isInitial": true,
+      "elapsedMs": 5959,
+      "generatedQuestions": 8,
+      "totalCells": 9,
+      "repairs": [],
+      "proposal": {
+        "targetId": null,
+        "title": "Autumn Editorial Photoshoot",
+        "summary": "Planning a 1-day editorial shoot for an autumn clothing line with two models.",
+        "sourceQuote": "We are planning an editorial photoshoot for our autumn clothing collection. We need two models for one full day. The studio, date, usage rights and budget are not decided yet.",
+        "neighbors": [
+          {
+            "title": "Studio Location",
+            "question": "What kind of studio space or aesthetic matches the collection?"
+          },
+          {
+            "title": "Target Date",
+            "question": "What target date or production timeline works best for release?"
+          },
+          {
+            "title": "Usage Rights",
+            "question": "Where and for how long will the model images be distributed?"
+          },
+          {
+            "title": "Overall Budget",
+            "question": "What total budget range is allocated for production and talent?"
+          },
+          {
+            "title": "Model Profiles",
+            "question": "What specific looks or casting criteria are required for the models?"
+          },
+          {
+            "title": "Creative Direction",
+            "question": "What mood, color palette, or styling themes will guide the shoot?"
+          },
+          {
+            "title": "Crew Requirements",
+            "question": "Which additional crew members, like photographers or stylists, are needed?"
+          },
+          {
+            "title": "Wardrobe Details",
+            "question": "How many outfits and looks need to be styled during the session?"
+          }
+        ],
+        "updates": [],
+        "questionUpdates": []
+      }
+    },
+    {
+      "isInitial": false,
+      "elapsedMs": 6285,
+      "generatedQuestions": 2,
+      "totalCells": 11,
+      "repairs": [],
+      "proposal": {
+        "targetId": "9058aaab-6ba8-49fa-acab-bce913fa9c63",
+        "title": "Model Profiles",
+        "summary": "Focusing on checking model availability and usage fees prior to casting.",
+        "sourceQuote": "Let us focus on booking the models. We need to check their availability and usage fees before choosing anyone.",
+        "neighbors": [
+          {
+            "title": "Agency Shortlist",
+            "question": "Which agencies or talent rosters are being contacted for options?"
+          },
+          {
+            "title": "Booking Deadlines",
+            "question": "When must model options and holds be confirmed?"
+          }
+        ],
+        "updates": [],
+        "questionUpdates": [
+          {
+            "targetId": "b7d634ff-1b0d-4695-ab6d-581188e5f30e",
+            "question": "What specific usage terms and media channels must be quoted to the models?"
+          }
+        ]
+      }
+    }
+  ]
+}

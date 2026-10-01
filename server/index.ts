@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import * as store from './db.js';
-import { generatePreview, generateFinal, structuredResponse, synthesizeSpeech, AssemblyAIStream, providerStatus, requireProviders } from './providers.js';
-import { DomainError, normalized, validateFinal, validatePreview } from './validation.js';
+import { generateFinal, structuredResponse, synthesizeSpeech, AssemblyAIStream, providerStatus, requireProviders } from './providers.js';
+import { DomainError, normalized, validateFinal } from './validation.js';
 import { reducePlan } from './domain.js';
 import { ThoughtBuffer, type CompletedToken } from './turn-state.js';
 import { durationCheck } from './checks.js';
@@ -17,6 +17,9 @@ import { fieldContext } from '../shared/field.js';
 import { applyField, validateField } from './field.js';
 import { registerReportRoutes } from './reports.js';
 import { speakerName } from '../shared/transcript.js';
+import { fastContext } from './fast-context.js';
+import { fastProposal } from './fast-schema.js';
+import { RecapQueue } from './recap-queue.js';
 import { appOrigin } from './config.js';
 // ELSE is an English-only product. Keep the request field for wire compatibility,
 // but never let a client override the planner or generated-card language.
@@ -64,6 +67,7 @@ export async function buildApp() {
         close: () => void;
         invalidate: () => void;
     }>();
+    const recaps = new RecapQueue(key => inFlight.has(key));
     const sessionClients = new Map<string, string>();
     const audioControllers = new Map<string, {
         sessionId?: string;
@@ -111,31 +115,43 @@ export async function buildApp() {
             throw new DomainError('inference_limit', 'Analysis capacity reached; try again shortly', 429);
         if (inFlight.has(flightKey))
             throw new DomainError('final_in_progress', 'A thought is already being processed', 409);
+        recaps.hold(flightKey);
         inFlight.add(flightKey);
-        const turnId = store.saveTranscript(ownerId, id, current.id, text), project = store.getProject(ownerId, id)!, sources = store.sourcesFor(ownerId, id);
-        const contextualNodes = Object.values(current.snapshot.nodes).slice(-36) as any[];
-        const root = Object.values(current.snapshot.nodes).find((n: any) => n.kind === 'idea');
-        if (root && !contextualNodes.includes(root))
-            contextualNodes.unshift(root);
-        const contextIds = new Set(contextualNodes.map(n => n.logicalId));
-        const compactSnapshot = { ...current.snapshot, nodes: Object.fromEntries(contextualNodes.map(n => [n.logicalId, n])), layout: undefined, field: undefined, dependencies: current.snapshot.dependencies.filter((l: any) => contextIds.has(l.sourceRef) && contextIds.has(l.targetRef)), navigation: current.snapshot.navigation.filter((l: any) => contextIds.has(l.parentId) && contextIds.has(l.childId)) };
-        const speakerTurns = throughSpeechId ? store.speechContextFor(ownerId, id, throughSpeechId).map(segment => ({text:segment.text.slice(0,1800),speaker:segment.speaker === undefined ? 'Unknown' : speakerName(segment.speaker),sessionId:segment.sessionId || null})) : [];
-        const input = { conversationField: fieldContext(current.snapshot.field), snapshot: compactSnapshot, currentTurnId: turnId, speakerTurns, sources: [...sources].slice(-12).map(([id, text]) => ({ id, text: text.slice(0, 1800) })), mode: body.mode === 'challenge' ? 'challenge' : 'develop', activeQuestion: current.snapshot.pendingQuestionId && current.snapshot.nodes[current.snapshot.pendingQuestionId], selectedNodeId: body.focusId || null };
         try {
-            let plan: any;
+            const fast = Boolean(body.sessionId);
+            const turnId = store.saveTranscript(ownerId, id, current.id, text), project = fast ? null : store.getProject(ownerId, id)!, sources = fast ? new Map<string, string>() : store.sourcesFor(ownerId, id);
+            const contextualNodes = fast ? [] : Object.values(current.snapshot.nodes).slice(-36) as any[];
+            const root = fast ? undefined : Object.values(current.snapshot.nodes).find((n: any) => n.kind === 'idea');
+            if (root && !contextualNodes.includes(root))
+                contextualNodes.unshift(root);
+            const contextIds = new Set(contextualNodes.map(n => n.logicalId));
+            const compactSnapshot = { ...current.snapshot, nodes: Object.fromEntries(contextualNodes.map(n => [n.logicalId, n])), layout: undefined, field: undefined, dependencies: current.snapshot.dependencies.filter((l: any) => contextIds.has(l.sourceRef) && contextIds.has(l.targetRef)), navigation: current.snapshot.navigation.filter((l: any) => contextIds.has(l.parentId) && contextIds.has(l.childId)) };
+            const speakerTurns = throughSpeechId ? store.speechContextFor(ownerId, id, throughSpeechId).map(segment => ({text:segment.text,speaker:segment.speaker === undefined ? 'Unknown' : speakerName(segment.speaker),sessionId:segment.sessionId || null})) : [];
+            const compactInput = fastContext(current.snapshot.field, text, speakerTurns);
+            const input = fast ? undefined : { conversationField: fieldContext(current.snapshot.field), snapshot: compactSnapshot, currentTurnId: turnId, speakerTurns, sources: [...sources].slice(-12).map(([id, text]) => ({ id, text: text.slice(0, 1800) })), mode: body.mode === 'challenge' ? 'challenge' : 'develop', activeQuestion: current.snapshot.pendingQuestionId && current.snapshot.nodes[current.snapshot.pendingQuestionId], selectedNodeId: body.focusId || null };
+            let plan: any, rawProposal: unknown;
             try {
-                plan = await generateFinal(text, languageOf(body.language), input, signal);
-                validateFinal(plan, current.snapshot, sources, turnId, new Set(project.branches.map((b: any) => b.id)), text);
-                if (plan.field)
-                    validateField(plan.field, current.snapshot.field, text, [...sources.values()]);
+                if (fast) {
+                    const proposal = fastProposal(rawProposal = await structuredResponse('fast', compactInput, signal), !current.snapshot.field);
+                    if (proposal.field) validateField(proposal.field, current.snapshot.field, text, [], true);
+                    plan = { language: 'en', intent: proposal.field ? 'develop' : 'no_change', statements: [], links: [], issues: [], question: null, branchIntent: null, assistantText: '', focusRef: null, field: proposal.field };
+                } else {
+                    plan = await generateFinal(text, languageOf(body.language), input!, signal);
+                    validateFinal(plan, current.snapshot, sources, turnId, new Set(project!.branches.map((b: any) => b.id)), text);
+                    if (plan.field) validateField(plan.field, current.snapshot.field, text, [...sources.values()]);
+                }
             }
             catch (error: any) {
-                if (error.code !== 'invalid_plan')
-                    throw error;
-                plan = await structuredResponse('final', { text, language: languageOf(body.language), ...input }, signal, { proposal: plan ?? null, errors: error.message });
-                validateFinal(plan, current.snapshot, sources, turnId, new Set(project.branches.map((b: any) => b.id)), text);
-                if (plan.field)
-                    validateField(plan.field, current.snapshot.field, text, [...sources.values()]);
+                if (error.code !== 'invalid_plan') throw error;
+                if (fast) {
+                    const proposal = fastProposal(await structuredResponse('fast', compactInput, signal, { proposal: rawProposal ?? null, errors: error.message }), !current.snapshot.field);
+                    if (proposal.field) validateField(proposal.field, current.snapshot.field, text, [], true);
+                    plan = { language: 'en', intent: proposal.field ? 'develop' : 'no_change', statements: [], links: [], issues: [], question: null, branchIntent: null, assistantText: '', focusRef: null, field: proposal.field };
+                } else {
+                    plan = await structuredResponse('final', { text, language: languageOf(body.language), ...input }, signal, { proposal: plan ?? null, errors: error.message });
+                    validateFinal(plan, current.snapshot, sources, turnId, new Set(project!.branches.map((b: any) => b.id)), text);
+                    if (plan.field) validateField(plan.field, current.snapshot.field, text, [...sources.values()]);
+                }
             }
             if (signal?.aborted)
                 throw new DomainError('cancelled', 'Thought changed before it was saved', 409);
@@ -160,6 +176,10 @@ export async function buildApp() {
                     const reduced = reducePlan(snapshot, plan);
                     if (plan.field)
                         reduced.snapshot.field = applyField(snapshot.field, plan.field, turnId);
+                    if (fast && plan.field && reduced.snapshot.field) {
+                        reduced.snapshot.field.planPending = true;
+                        reduced.snapshot.field.planPendingTurnIds = [...(snapshot.field?.planPendingTurnIds || []), turnId];
+                    }
                     const calculation = durationCheck(text, turnId);
                     if (calculation?.shortfall) {
                         const id = store.uuid();
@@ -169,7 +189,7 @@ export async function buildApp() {
                             reduced.snapshot.navigation.push({ parentId: root, childId: id });
                         reduced.snapshot.layout = layoutNewNodes(reduced.snapshot);
                     }
-                    snapshot = store.saveBranch(ownerId, id, destination.id, reduced.snapshot, 'final_plan', { turnId, plan, operationId }, destination.revision);
+                    snapshot = store.saveBranch(ownerId, id, destination.id, reduced.snapshot, 'final_plan', { turnId, plan, operationId, throughSpeechId }, destination.revision);
                     focusId = reduced.focusId;
                 }
                 const replyId = body.muted ? null : queueReply(ownerId, id, destination.id, plan.assistantText, body.contextEpoch || 0, body.sessionId);
@@ -181,6 +201,7 @@ export async function buildApp() {
         }
         finally {
             inFlight.delete(flightKey);
+            recaps.resume(flightKey);
         }
     }
     app.get('/healthz', async () => ({ ok: true, service: 'ELSE', schemaVersion: 1 }));
@@ -203,7 +224,7 @@ export async function buildApp() {
         branch(ownerId, req.params.id);
         return { segments: store.speechSegmentsFor(ownerId, req.params.id) };
     });
-    app.delete('/api/projects/:id', async (req: any) => { const ownerId = owner(req); branch(ownerId, req.params.id); for (const live of liveSessions.values())
+    app.delete('/api/projects/:id', async (req: any) => { const ownerId = owner(req); branch(ownerId, req.params.id); recaps.cancelProject(req.params.id); for (const live of liveSessions.values())
         if (live.project === req.params.id)
             live.close(); for (const [id, active] of audioControllers)
         if (active.project === req.params.id) {
@@ -274,6 +295,7 @@ export async function buildApp() {
                     throw new DomainError('unsupported_command', 'Unsupported command', 400);
                 snapshot = store.saveBranch(ownerId, id, current.id, snapshot, type, payload, expected);
             }
+            recaps.cancelProject(id);
             for (const live of liveSessions.values())
                 if (live.project === id)
                     live.invalidate();
@@ -322,7 +344,7 @@ export async function buildApp() {
         const stream = new AssemblyAIStream(), thought = new ThoughtBuffer();
         let stopAfterFinal = false, lastInterrupt = 0;
         const clientId = sessionClients.get(session.id);
-        let epoch = session.context_epoch || 0, language: 'en' = 'en', mode = 'develop', muted = false, finishRequested = false, stopped = false, previewBusy = false, lastPreview = 0, previewTimer: ReturnType<typeof setTimeout> | undefined, finalTimer: ReturnType<typeof setTimeout> | undefined, forceTimer: ReturnType<typeof setTimeout> | undefined, finalController: AbortController | undefined, previewController: AbortController | undefined, activeFinalToken: CompletedToken | undefined;
+        let epoch = session.context_epoch || 0, language: 'en' = 'en', mode = 'develop', muted = false, finishRequested = false, stopped = false, finalTimer: ReturnType<typeof setTimeout> | undefined, forceTimer: ReturnType<typeof setTimeout> | undefined, finalController: AbortController | undefined, activeFinalToken: CompletedToken | undefined;
         const send = (type: string, payload: any = {}) => { if (socket.readyState !== 1)
             return; if (socket.bufferedAmount > 128000) {
             socket.close(1013, 'slow_client');
@@ -332,40 +354,17 @@ export async function buildApp() {
             clearTimeout(finalTimer); finalTimer = undefined; finalController?.abort(); };
         const expire = setTimeout(() => { send('fork.error', { code: 'session_limit', message: 'Voice session time limit reached' }); cleanup(); socket.close(1000, 'session_limit'); }, Math.max(1, Date.parse(session.expires_at) - Date.now()));
         function cleanup() { if (stopped)
-            return; stopped = true; clearTimeout(expire); clearFinal(); if (previewTimer)
-            clearTimeout(previewTimer); if (forceTimer)
-            clearTimeout(forceTimer); previewController?.abort(); stream.close(); stopAudio(session.id); store.endSession(session.id); liveSessions.delete(session.id); sessionClients.delete(session.id); }
+            return; stopped = true; clearTimeout(expire); clearFinal(); if (forceTimer)
+            clearTimeout(forceTimer); stream.close(); stopAudio(session.id); store.endSession(session.id); liveSessions.delete(session.id); sessionClients.delete(session.id); }
         const interrupt = () => { if (Date.now() - lastInterrupt < 250)
             return; lastInterrupt = Date.now(); stopAudio(session.id); epoch++; store.db.prepare('UPDATE sessions SET context_epoch=? WHERE id=?').run(epoch, session.id); };
-        liveSessions.set(session.id, { project: session.project_id, clientId, close: () => { cleanup(); socket.close(1000, 'session_closed'); }, invalidate: () => { clearFinal(); previewController?.abort(); interrupt(); } });
-        async function preview() { if (stopped || previewBusy || !thought.text || thought.text.split(/\s+/).length < 6)
-            return; const delay = Math.max(0, Number(process.env.PREVIEW_INTERVAL_MS || 1500) - (Date.now() - lastPreview)); if (delay) {
-            if (!previewTimer)
-                previewTimer = setTimeout(() => { previewTimer = undefined; void preview(); }, delay);
-            return;
-        } previewBusy = true; lastPreview = Date.now(); const token = thought.token(), start = Date.now(), capturedEpoch = epoch, b = branch(ownerId, session.project_id, session.branch_id); previewController = new AbortController(); try {
-            rate(`preview:${ownerId}`, Number(process.env.PREVIEW_MAX_PER_MINUTE || 30));
-            const value = await generatePreview(token.text.slice(-6000), language, previewController.signal);
-            validatePreview(value, thought.text);
-            if (!stopped && epoch === capturedEpoch && thought.acceptsPreview(token) && Date.now() - start <= 3500 && branch(ownerId, session.project_id, session.branch_id).revision === b.revision)
-                send('fork.draft', { preview: value, transcriptRevision: token.revision, semanticEpoch: token.semanticEpoch, turnGroupId: String(token.group) });
-        }
-        catch (error: any) {
-            if (!previewController.signal.aborted && error.code !== 'rate_limit')
-                send('fork.agent_status', { status: 'draft_unavailable' });
-        }
-        finally {
-            previewBusy = false;
-            if (!stopped && thought.text !== token.text)
-                void preview();
-        } }
+        liveSessions.set(session.id, { project: session.project_id, clientId, close: () => { cleanup(); socket.close(1000, 'session_closed'); }, invalidate: () => { clearFinal(); interrupt(); } });
         async function finalize() {
             if (stopped || finalController || thought.hold && !finishRequested)
                 return;
             const token = thought.completedToken();
             if (!token)
                 return;
-            previewController?.abort();
             if (forceTimer)
                 clearTimeout(forceTimer);
             const capturedEpoch = epoch, b = branch(ownerId, session.project_id, session.branch_id);
@@ -385,6 +384,8 @@ export async function buildApp() {
                         store.db.prepare('UPDATE sessions SET branch_id=? WHERE id=?').run(session.branch_id, session.id);
                     }
                     send('fork.committed', result);
+                    if (result.snapshot.field?.planPending) recaps.schedule({ owner: ownerId, project: session.project_id,
+                        branch: result.snapshot.branchId, clientId, notify: send });
                     send('fork.transcript', { text: thought.text, isFinal: thought.allFinal });
                     send('fork.reply', { text: result.plan.assistantText, replyId: result.replyId, format: 'pcm', sampleRate: 24000 });
                     send('fork.agent_status', { status: 'listening' });
@@ -418,7 +419,7 @@ export async function buildApp() {
             return; if (finalTimer)
             clearTimeout(finalTimer); if (activeFinalToken && !thought.acceptsCompleted(activeFinalToken))
             finalController?.abort(); if (thought.semanticEpoch !== previousEpoch)
-            send('fork.draft', { preview: null, semanticEpoch: thought.semanticEpoch }); send('fork.transcript', { text: thought.text, transcript: text, isFinal: final, segmentId, transcriptRevision: thought.revision, semanticEpoch: thought.semanticEpoch }); void preview(); if (thought.completedToken() && (!thought.hold || finishRequested)) {
+            send('fork.draft', { preview: null, semanticEpoch: thought.semanticEpoch }); send('fork.transcript', { text: thought.text, transcript: text, isFinal: final, segmentId, transcriptRevision: thought.revision, semanticEpoch: thought.semanticEpoch }); if (thought.completedToken() && (!thought.hold || finishRequested)) {
             finalTimer = setTimeout(() => void finalize(), 300);
         } };
         stream.onError = () => { send('fork.error', { code: 'stt_error', message: 'Speech recognition disconnected. Your last thought has not been saved.', recoverableText: thought.text }); cleanup(); socket.close(1011, 'stt_error'); };
@@ -445,6 +446,8 @@ export async function buildApp() {
                     mode = payload.mode === 'challenge' ? 'challenge' : 'develop';
                     muted = Boolean(payload.muted);
                     thought.hold = Boolean(payload.hold);
+                    if (branch(ownerId, session.project_id, session.branch_id).snapshot.field?.planPending)
+                        recaps.schedule({ owner: ownerId, project: session.project_id, branch: session.branch_id, clientId, notify: send });
                     if (!stream.ws)
                         stream.connect();
                     break;
@@ -471,7 +474,7 @@ export async function buildApp() {
                     break;
                 case 'fork.set_focus':
                     clearFinal();
-                    previewController?.abort();
+                    recaps.cancelProject(session.project_id);
                     stopAudio(session.id);
                     if (payload.branchId) {
                         branch(ownerId, session.project_id, payload.branchId);
@@ -515,7 +518,7 @@ export async function buildApp() {
         app.setNotFoundHandler((req, reply) => { if (req.url.startsWith('/api/'))
             return reply.code(404).send({ error: 'not_found' }); return reply.sendFile('index.html'); });
     }
-    app.addHook('onClose', async () => { for (const live of liveSessions.values())
+    app.addHook('onClose', async () => { recaps.close(); for (const live of liveSessions.values())
         live.close(); for (const active of audioControllers.values())
         active.controller.abort(); });
     return app;

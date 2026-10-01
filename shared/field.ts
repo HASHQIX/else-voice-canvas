@@ -27,6 +27,8 @@ export interface ConversationField {
   focusId: string;
   cells: Record<string, FieldCell>;
   plan?: ConversationPlan;
+  planPending?: boolean;
+  planPendingTurnIds?: string[];
 }
 
 export interface FieldProposal {
@@ -37,6 +39,7 @@ export interface FieldProposal {
   neighbors: Array<{ title: string; question: string }>;
   updates?: Array<{ targetId: string; summary: string; sourceQuote: string }>;
   plan?: ConversationPlan;
+  questionUpdates?: Array<{ targetId: string; question: string }>;
 }
 
 export const neighborOffsets = [

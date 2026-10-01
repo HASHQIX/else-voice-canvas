@@ -1,0 +1,32 @@
+{
+  "testedAt": "2026-10-01T14:24:12.155Z",
+  "mode": "Chromium with synthetic WebSocket speech and field snapshots; no paid provider calls",
+  "firstBatchArrivalsMs": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "subsequentQuestionGapMs": 2497,
+  "checks": [
+    "complete opening grid",
+    "700ms two-sided flips",
+    "stationary nine-slot layout",
+    "no gaps on sparse focus neighborhoods",
+    "ten-second hold after completion",
+    "2.5-second spacing between eligible slots",
+    "newest pending text",
+    "interrupted focus changes",
+    "reduced motion",
+    "queue cleared on reset",
+    "desktop/mobile geometry",
+    "35% smaller face",
+    "voice/transcript/recap/report lifecycle"
+  ],
+  "pageErrors": []
+}

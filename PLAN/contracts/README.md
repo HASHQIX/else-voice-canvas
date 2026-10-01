@@ -1,5 +1,17 @@
 # Contracts v1
 
+## Current live-field extension (October 1, 2026)
+
+The original graph schemas below remain the legacy text-turn contract. Live voice now uses `server/fast-schema.ts`: `{field: null | proposal}` with no cumulative plan. When no field exists, `conversationField.isInitial=true` selects the opening schema requiring exactly eight new questions. Filler may return null; the first meaningful field must still fill all eight neighbors. Subsequent responses allow at most three new questions, two related factual updates, and two `questionUpdates`. A later meaningful new topic needs at least one question. Targets must exist in the current saved field; question refreshes are restricted to unvisited neighbors of the selected destination. Source quotes must come from the current completed thought. The server owns IDs, coordinates, revisions and persistence.
+
+`server/fast-context.ts` bounds the request to the local neighborhood, at most three lexically relevant older cells, one bounded speaker window and short plan memory. Each destination explicitly supplies eligible unanswered-neighbor IDs. The native provider schema is not duplicated in the system prompt.
+
+Background memory uses a separate `{plan: ...}` schema and `PLAN/prompts/recap-system.md`. Durable `planPendingTurnIds` reference only successfully committed turns in the current snapshot, including inherited branch work. Failed inference attempts and undone future turns are excluded. A recap may retain quoted previous-plan evidence; new decisions/actions need verbatim supporting quotes. Exact quotations establish traceability, not semantic truth or consensus.
+
+`fork.committed` delivers the saved fast field immediately. `fork.plan` delivers a later snapshot with a higher revision, preserving live transcript, camera and microphone state. `fork.plan_status` with `status: deferred` reports a background failure; saved questions remain available and pending work retries on later speech/reconnect. Deletion, manual commands and explicit focus changes cancel queued recaps; revision and lease checks guard persistence. Background recap persistence updates the current undo entry. The latest cumulative plan can lag the field and is labelled accordingly.
+
+The original full-plan requirements below apply to the compatibility path, not to the new incremental live response.
+
 JSON Schema files are the wire contracts for model output. Context/IDs identifying the destination are attached by trusted server code, not requested from the LLM. Use schema content in Responses API `text.format` as `json_schema`, `strict: true`; validate again on the server. Runtime must handle refusal and incomplete output.
 
 All object properties are required; optional values use `null`. Array/string limits and domain semantics are deliberately checked by the domain validator, not only by the provider subset of JSON Schema. Typescript interfaces are reference types; verify schema/type consistency when generating real application types.

@@ -46,7 +46,9 @@ export function ConversationPlan({ field, transcript, microphone, newConversatio
   const discussed = cells.filter(cell => cell.visited);
   const plan = field?.plan;
   const focus = field?.cells[field.focusId];
-  const questions = plan?.openQuestions ?? cells.filter(cell => !cell.visited).map(cell => cell.question);
+  const localQuestions = cells.filter(cell => !cell.visited && (!focus || Math.abs(cell.x-focus.x)<=1 && Math.abs(cell.y-focus.y)<=1)).map(cell => cell.question);
+  const questions = field?.planPending ? [...new Set([...localQuestions, ...(plan?.openQuestions || [])])].slice(0,12)
+    : plan?.openQuestions ?? localQuestions;
   const speakerLabels = speechSpeakerLabels(transcript);
   return <aside id="conversation-plan" className="conversation-plan" aria-label="Conversation plan">
     <div className="plan-start">
@@ -58,6 +60,7 @@ export function ConversationPlan({ field, transcript, microphone, newConversatio
     <div id="conversation-plan-content" className="plan-body">
     <div className="plan-content" ref={contentElement} tabIndex={0} role="region" aria-label="Conversation details">
     <div className="plan-priorities">
+    {field?.planPending && <p className="plan-refresh-status" role="status">Summary may lag the latest speech.</p>}
       {discussed.length ? <>
         {focus && <section className="plan-context" aria-label="Current topic"><h2>{focus.title}</h2></section>}
         <PlanList title="To clarify" items={questions} kind="clarify"/>

@@ -19,7 +19,7 @@ export function buildConversationReport(field: ConversationField | undefined, tr
   return {
     title: field?.plan?.title || topics[0]?.title || 'Conversation report',
     capturedAt,
-    inProgress,
+    inProgress: inProgress || Boolean(field?.planPending),
     decisions: field?.plan?.decisions.map(entry => entry.text) || [],
     openQuestions: [...(field?.plan?.openQuestions ?? cells.filter(cell => !cell.visited).map(cell => cell.question))],
     nextSteps: field?.plan?.nextSteps.map(entry => entry.text) || [],

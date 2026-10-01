@@ -1,5 +1,7 @@
 # FORK — Developer Handoff v1.0 · English Edition
 
+> Historical reference package. The implemented product is **ELSE**, English-only. Subsequent user decisions and the root `README.md` / `PROJECT_STATE.md` supersede the original name, bilingual UI, provider and layout choices below. Live questions and cumulative summaries use separate fast/background contracts described in `contracts/README.md`.
+
 Source specification date: September 30, 2026. Specification language: English. This package contains requirements and reference assets, NOT a finished application.
 
 This is a full translation of the original handoff, not a new architecture revision. Russian/English application support is still required. User-facing examples and the synthetic fixture dialogue have been translated into English; the sample final-plan fixture therefore uses `language: "en"`. The `ru | en` contracts and Russian-language acceptance requirements are unchanged. Provider references retain the source document's verification date; no new live-provider verification is claimed.

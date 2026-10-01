@@ -31,6 +31,12 @@ it('does not invent decisions for a legacy or transcript-only conversation', () 
   expect(reportToText(report)).toContain('No confirmed decisions or facts recorded.');
   expect(reportToText(report)).not.toContain('ongoing conversation');
 });
+
+it('marks paused exports as incomplete while a background plan is pending', () => {
+  const report = buildConversationReport({ focusId: '', cells: {}, planPending: true }, [], '2026-10-01T10:00:00Z', false);
+  expect(report.inProgress).toBe(true);
+  expect(reportToText(report)).toContain('latest speech may still be awaiting analysis');
+});
 it('includes voice labels and unknown attribution in the copyable full transcript',()=>{
  const report=buildConversationReport(undefined,[
   {id:'s:1',text:'What is the budget?',final:true,createdAt:'2026-09-30T10:00:00Z',speaker:'A',sessionId:'s'},
