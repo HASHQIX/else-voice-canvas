@@ -48,7 +48,7 @@ it('commits a background thought while speech continues, then processes retained
     const titles = target ? ['Availability', 'Agency', 'Rates'] : ['Model booking', 'Studio', 'Budget', 'Dates', 'Rights', 'Crew', 'Style', 'Backup'];
     const neighborSchema = body.tools[0].input_schema.properties.field.anyOf[1].properties.neighbors;
     expect(neighborSchema.maxItems).toBe(input.conversationField.isInitial ? 8 : 3);
-    if (input.conversationField.isInitial) expect(neighborSchema.minItems).toBe(8);
+    if (input.conversationField.isInitial) expect(neighborSchema.minItems).toBe(1);
     const plan = {
       field: { targetId: target?.id || null, title: target?.title || 'Photoshoot planning', summary: input.text, sourceQuote: input.text, updates: [], questionUpdates: [], neighbors: titles.map(title => ({ title, question: `What about ${title}?` })) } };
     return new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'else_fast', input: plan }] }));

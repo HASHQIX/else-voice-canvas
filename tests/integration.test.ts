@@ -211,7 +211,7 @@ it.each([true,false])('validates compact Gemini neighbor counts before saving (r
   llmCalls++;
   const body=JSON.parse(options.body),input=JSON.parse(body.messages[1].content).context;
   expect(body.response_format.json_schema.schema.properties.field.anyOf).toHaveLength(2);
-  const count=llmCalls===2&&repairSucceeds?8:7;
+  const count=llmCalls===2&&repairSucceeds?8:9;
   const field={targetId:null,title:'Shoot planning',summary:'Plan a shoot.',sourceQuote:input.text,updates:[],plan:{title:'Shoot planning',summary:'Plan a shoot.',decisions:[],nextSteps:[],openQuestions:[]},neighbors:Array.from({length:count},(_,i)=>({title:`Question ${i}`,question:'What needs clarifying?'}))};
   return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({field})}}]}));
  }));

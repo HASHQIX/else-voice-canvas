@@ -11,10 +11,11 @@ export function validateField(proposal: FieldProposal, field: ConversationField 
   const center = target || nextTopicPosition(field);
   const vacancies = vacantNeighbors(field, center);
   const incremental = fast && Boolean(field);
-  if (incremental ? proposal.neighbors.length > Math.min(3, vacancies.length) : proposal.neighbors.length !== vacancies.length) {
-    throw new DomainError('invalid_plan', incremental ? `This focus allows at most ${Math.min(3, vacancies.length)} new questions` : `This focus needs exactly ${vacancies.length} new questions`);
+  const limit = incremental ? Math.min(3, vacancies.length) : vacancies.length;
+  if (proposal.neighbors.length > limit) {
+    throw new DomainError('invalid_plan', `This focus allows at most ${limit} new questions`);
   }
-  if (fast && !target && vacancies.length && !proposal.neighbors.length)
+  if (!target && vacancies.length && !proposal.neighbors.length)
     throw new DomainError('invalid_plan', 'A meaningful new topic needs at least one blind-spot question');
   const titles = new Set(Object.values(field?.cells || {})
     .filter(cell => Math.abs(cell.x - center.x) <= 1 && Math.abs(cell.y - center.y) <= 1)

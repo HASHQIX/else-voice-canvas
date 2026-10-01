@@ -70,7 +70,7 @@ export function vacantNeighbors(field: ConversationField | undefined, center: { 
     .filter(({ x, y }) => !field || !cellAt(field, x, y));
 }
 
-/** Compact model context includes the exact number of questions needed at each destination. */
+/** Compact model context includes the available question slots at each destination. */
 export function fieldContext(field?: ConversationField) {
   const newCenter = nextTopicPosition(field);
   return {

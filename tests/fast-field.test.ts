@@ -9,7 +9,7 @@ const proposal: FieldProposal = { targetId: null, title: 'Editorial shoot', summ
   updates: [], questionUpdates: [], neighbors: ['Models', 'Studio', 'Budget'].map(title => ({ title, question: `What about ${title}?` })) };
 const opening: FieldProposal = { ...proposal, neighbors: ['Models', 'Studio', 'Budget', 'Dates', 'Rights', 'Crew', 'Style', 'Backup'].map(title => ({ title, question: `What about ${title}?` })) };
 
-it('requires eight genuine questions for the first meaningful field and keeps later batches bounded', () => {
+it('allows a sparse opening rather than forcing filler, while bounding later batches', () => {
   expect(fastContext(undefined, words, []).conversationField.isInitial).toBe(true);
   expect(fastProposal({ field: null }, true)).toEqual({ field: null });
   const parsed = fastProposal({ field: opening }, true);
@@ -17,8 +17,12 @@ it('requires eight genuine questions for the first meaningful field and keeps la
   const saved = applyField(undefined, parsed.field!, 'opening');
   expect(Object.keys(saved.cells)).toHaveLength(9);
   expect(fastContext(saved, words, []).conversationField.isInitial).toBe(false);
-  expect(() => fastProposal({ field: proposal }, true)).toThrow('schema');
-  expect(() => validateField(proposal, undefined, words, [], true)).toThrow('exactly 8');
+  expect(fastProposal({ field: proposal }, true).field?.neighbors).toHaveLength(3);
+  validateField(proposal, undefined, words, [], true);
+  expect(Object.keys(applyField(undefined, proposal, 'sparse').cells)).toHaveLength(4);
+  expect(() => fastProposal({ field: { ...proposal, neighbors: [] } }, true)).toThrow('schema');
+  expect(() => validateField({ ...proposal, neighbors: [] }, undefined, words, [], true)).toThrow('at least one');
+  expect(() => fastProposal({ field: { ...opening, neighbors: [...opening.neighbors, { title: 'Extra', question: 'What is missing?' }] } }, true)).toThrow('schema');
   expect(() => fastProposal({ field: opening })).toThrow('schema');
   const partial = applyField(undefined, { ...proposal, neighbors: [] }, 'legacy');
   expect(() => validateField({ ...opening, targetId: partial.focusId }, partial, words, [], true)).toThrow('at most 3');

@@ -15,7 +15,7 @@ field.properties.questionUpdates = { type: 'array', maxItems: 2, items: {
 field.required.push('questionUpdates');
 export const fastSchema = { type: 'object', properties: { field: { anyOf: [{ type: 'null' }, field] } }, required: ['field'], additionalProperties: false };
 export const initialFastSchema = structuredClone(fastSchema);
-initialFastSchema.properties.field.anyOf[1].properties.neighbors.minItems = 8;
+initialFastSchema.properties.field.anyOf[1].properties.neighbors.minItems = 1;
 initialFastSchema.properties.field.anyOf[1].properties.neighbors.maxItems = 8;
 export const recapSchema = { type: 'object', properties: { plan: structuredClone(finalSchema.properties.field.anyOf[1].properties.plan) }, required: ['plan'], additionalProperties: false };
 const checkFast = ajv.compile(fastSchema), checkInitialFast = ajv.compile(initialFastSchema), checkRecap = ajv.compile(recapSchema);

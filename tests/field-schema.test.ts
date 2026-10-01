@@ -5,11 +5,12 @@ import { applyField, validateField } from '../server/field.js';
 import { fieldContext } from '../shared/field.js';
 const Ajv = AjvModule.default || AjvModule;
 const ajv = new Ajv({ strict: false });
-it('constrains each focus destination to the exact vacant neighbor count', () => {
+it('caps each focus destination at its vacant neighbor count', () => {
  const validate=ajv.compile(fieldModelSchema({newTopicVacancies:8,cells:[{id:'existing',vacancies:0},{id:'neighbor',vacancies:5}]}));
  const field={targetId:null as string|null,title:'Topic',summary:'Summary',sourceQuote:'Quote',updates:[],plan:{title:'Overall conversation',summary:'What we know.',decisions:[],nextSteps:[],openQuestions:['What is still unknown?']},neighbors:Array.from({length:8},(_,i)=>({title:`Topic ${i}`,question:'Question?'}))};
  expect(validate({field})).toBe(true);
- expect(validate({field:{...field,neighbors:[]}})).toBe(false);
+ expect(validate({field:{...field,neighbors:field.neighbors.slice(0,3)}})).toBe(true);
+ expect(validate({field:{...field,neighbors:[...field.neighbors,{title:'Extra',question:'What else?'}]}})).toBe(false);
  expect(validate({field:{...field,targetId:'existing',neighbors:[]}})).toBe(true);
  expect(validate({field:{...field,targetId:'neighbor',neighbors:field.neighbors.slice(0,5)}})).toBe(true);
  expect(validate({field:{...field,targetId:'invented'}})).toBe(false);
@@ -43,15 +44,16 @@ it('keeps a single Gemini plan shape as the conversation reaches its 250-cell li
  expect(ajv.compile(fieldModelSchema({newTopicVacancies:8,cells:[]},{compact:true}))({field:proposal})).toBe(false);
 });
 
-it('enforces exact vacancy counts and supporting quotes after compact schema parsing',()=>{
+it('allows fewer useful questions while enforcing vacancy limits and supporting quotes',()=>{
  const proposal={targetId:null as string|null,title:'Photoshoot',summary:'An editorial shoot.',sourceQuote:'Plan a shoot',updates:[],neighbors:Array.from({length:8},(_,i)=>({title:`Topic ${i}`,question:'What should we clarify?'})),plan:{title:'Shoot plan',summary:'An editorial shoot.',decisions:[],nextSteps:[],openQuestions:[]}};
  const field=applyField(undefined,proposal,'turn');
  const context=fieldContext(field),target=context.cells.find(cell=>cell.vacancies===5)!;
- const candidate={...proposal,targetId:target.id,title:'New details',neighbors:proposal.neighbors.slice(0,4)};
+ const candidate={...proposal,targetId:target.id,title:'New details',neighbors:Array.from({length:4},(_,i)=>({title:`New question ${i}`,question:'What is missing?'}))};
  expect(ajv.compile(fieldModelSchema(context,{compact:true}))({field:candidate})).toBe(true);
- expect(()=>validateField(candidate,field,'Plan a shoot.')).toThrow('exactly 5');
+ expect(()=>validateField(candidate,field,'Plan a shoot.')).not.toThrow();
  const correct={...candidate,neighbors:Array.from({length:5},(_,i)=>({title:`New question ${i}`,question:'What is missing?'}))};
  expect(()=>validateField(correct,field,'Plan a shoot.')).not.toThrow();
+ expect(()=>validateField({...correct,neighbors:[...correct.neighbors,{title:'Too many',question:'What else?'}]},field,'Plan a shoot.')).toThrow('at most 5');
  expect(()=>validateField({...correct,targetId:'unknown'},field,'Plan a shoot.')).toThrow('Unknown field focus');
  expect(()=>validateField({...correct,sourceQuote:'Made up'},field,'Plan a shoot.')).toThrow('quote');
 });

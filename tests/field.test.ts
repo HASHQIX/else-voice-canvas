@@ -90,7 +90,8 @@ describe('persistent conversation field', () => {
   it('rejects invented targets, invented quotes, wrong counts and repeated neighboring topics', () => {
     expect(() => validateField({ ...initial, targetId: 'invented' }, undefined, text)).toThrow('Unknown field focus');
     expect(() => validateField({ ...initial, sourceQuote: 'Confirmed models' }, undefined, text)).toThrow('quote');
-    expect(() => validateField({ ...initial, neighbors: initial.neighbors.slice(1) }, undefined, text)).toThrow('exactly 8');
+    expect(() => validateField({ ...initial, neighbors: [] }, undefined, text)).toThrow('at least one');
+    expect(() => validateField({ ...initial, neighbors: [...initial.neighbors, { title: 'Extra', question: 'What is missing?' }] }, undefined, text)).toThrow('at most 8');
     expect(() => validateField({ ...initial, neighbors: Array(8).fill(initial.neighbors[0]) }, undefined, text)).toThrow('distinct');
     const field = makeField(), target = cellAt(field, 0, -1)!;
     expect(() => validateField({ ...initial, targetId: target.id, neighbors: [initial.neighbors[0], { title: 'Floor area', question: 'How large?' }, { title: 'Power', question: 'Is power available?' }] }, field, text)).toThrow('distinct');

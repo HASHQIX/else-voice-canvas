@@ -4,7 +4,7 @@ import { DomainError, finalSchema } from './validation.js';
 export function fieldModelSchema(context: { newTopicVacancies: number; cells: Array<{ id: string; vacancies: number }> }, options: { compact?: boolean } = {}) {
   if (options.compact) {
     // Gemini rejects large unions and growing UUID enums. Keep a constant shape;
-    // validateField still checks target membership and the exact vacancy count
+    // validateField still checks target membership and the vacancy limit
     // before persistence, using the existing repair path on a mismatch.
     const shape = structuredClone(finalSchema.properties.field.anyOf[1]);
     shape.required.push('plan');
@@ -26,7 +26,7 @@ export function fieldModelSchema(context: { newTopicVacancies: number; cells: Ar
       ...(strings.length ? [{ type: 'string', enum: strings }] : []),
       ...(ids.includes(null) ? [{ type: 'null' }] : []),
     ] };
-    shape.properties.neighbors.minItems = count;
+    shape.properties.neighbors.minItems = 0;
     shape.properties.neighbors.maxItems = count;
     return shape;
   });
